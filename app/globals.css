@@ -1,26 +1,111 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --primary: #ce1212;
+  --secondary: #1a1a1a;
+  --background: #f8fafc;
+  --foreground: #1a1a1a;
+  --input-bg: #ffffff;
+  --input-border: #e5e7eb;
 }
 
 @theme inline {
+  --color-primary: var(--primary);
+  --color-secondary: var(--secondary);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
-  background: var(--background);
+  background-color: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Roboto', Arial, sans-serif;
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Form Elemanları Global Düzenleme */
+input, select, textarea {
+  color: #1a1a1a !important;
+  background-color: #ffffff !important;
+  border: 1px solid var(--input-border) !important;
+  transition: all 0.2s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary) !important;
+  ring: 2px;
+  ring-color: rgba(206, 18, 18, 0.1);
+  outline: none;
+}
+
+/* Responsive Dashboard Konteynırı */
+main .max-w-5xl {
+  max-width: 80rem; /* Daha geniş çalışma alanı */
+}
+
+/* Materyal Satırları (Responsive Grid) */
+.material-row {
+  display: grid;
+  grid-template-cols: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .material-row {
+    grid-template-cols: 160px 1fr 2fr auto;
+    align-items: center;
+  }
+}
+
+/* Logo ve Başlık Stilleri */
+.logo-text {
+  color: var(--primary) !important;
+  font-weight: 900;
+  letter-spacing: -0.025em;
+}
+
+/* Video ve Iframe Konteynırı */
+.video-aspect-container {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  position: relative;
+  background: #000;
+  border-radius: 1.5rem;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+.video-aspect-container iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* Özel Scrollbar (Sidebar ve Listeler için) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Animasyonlar */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+form {
+  animation: fadeIn 0.5s ease-out;
 }
