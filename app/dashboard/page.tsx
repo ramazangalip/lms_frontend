@@ -45,13 +45,14 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [completedMaterials, setCompletedMaterials] = useState<number[]>([]);
   
+  // Arka plan takip süresi (10 Dakika = 600 Saniye)
   const [watchTime, setWatchTime] = useState(0);
-  const watchThreshold = 600; // 10 Dakika (Test için ideal)
+  const watchThreshold = 1200; 
 
   const trackingInterval = useRef<NodeJS.Timeout | null>(null);
   const watchTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. VERİLERİ ÇEKME
+  // 1. VERİLERİ ÇEKME VE BİRLEŞTİRME
   const fetchContents = useCallback(async (isUpdate = false) => {
     try {
       const [contentRes, progressRes, completedMatsRes] = await Promise.all([
@@ -77,12 +78,10 @@ export default function StudentDashboard() {
       const sortedData = mergedData.sort((a, b) => a.week_number - b.week_number);
       setContents(sortedData);
       
-      // EĞER İLK YÜKLEME İSE (isUpdate false) VE HENÜZ HAFTA SEÇİLMEDİYSE
       if (!isUpdate && sortedData.length > 0 && !selectedWeek) {
         setSelectedWeek(sortedData[0]);
         if (sortedData[0].materials.length > 0) setActiveMaterial(sortedData[0].materials[0]);
       } 
-      // EĞER GÜNCELLEME İSE, SADECE SEÇİLİ HAFTANIN VERİSİNİ TAZELE (Sıfırlama yapma)
       else if (selectedWeek) {
         const updated = sortedData.find((c: WeeklyContent) => c.id === selectedWeek.id);
         if (updated) setSelectedWeek(updated);
@@ -94,11 +93,9 @@ export default function StudentDashboard() {
     }
   }, [selectedWeek]);
 
-  // İlk yükleme için Effect
   useEffect(() => {
     fetchContents();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Bağımlılık dizisini boş bırakarak döngüyü kırdık
+  }, [fetchContents]);
 
   // 2. MATERYAL TAMAMLAMA İŞLEMİ
   const handleCompleteMaterial = async (materialId: number) => {
@@ -106,13 +103,13 @@ export default function StudentDashboard() {
       await api.post('/contents/complete-material/', { material_id: materialId });
       if (watchTimerRef.current) clearInterval(watchTimerRef.current);
       setWatchTime(0);
-      await fetchContents(true); // isUpdate = true gönderiyoruz
+      await fetchContents(true);
     } catch (err) {
       console.error("Tamamlama hatası");
     }
   };
 
-  // 3. SAYAÇ MEKANİZMASI
+  // 3. AKILLI İZLEME TAKİBİ (Arka Planda Çalışır)
   useEffect(() => {
     if (watchTimerRef.current) clearInterval(watchTimerRef.current);
 
@@ -143,14 +140,7 @@ export default function StudentDashboard() {
     };
   }, [activeMaterial?.id, completedMaterials.length]);
 
-  const formatTime = (seconds: number) => {
-    const totalRemaining = watchThreshold - seconds;
-    const mins = Math.floor(totalRemaining / 60);
-    const secs = totalRemaining % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
-
-  // 4. PING SİSTEMİ
+  // 4. PING SİSTEMİ (Heartbeat)
   useEffect(() => {
     if (selectedWeek) {
       if (trackingInterval.current) clearInterval(trackingInterval.current);
@@ -181,6 +171,7 @@ export default function StudentDashboard() {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-roboto">
+      {/* SOL MENÜ */}
       <aside className="w-80 bg-secondary shadow-2xl flex flex-col border-r border-gray-800">
         <div className="p-6 border-b border-gray-700 bg-black/20 text-center">
           <h2 className="logo-text text-xl text-white tracking-widest text-primary font-bold uppercase">BÜ-LMS</h2>
@@ -241,6 +232,7 @@ export default function StudentDashboard() {
         </button>
       </aside>
 
+      {/* ANA İÇERİK ALANI */}
       <main className="flex-1 overflow-y-auto bg-white custom-scrollbar">
         {selectedWeek ? (
           <div className="max-w-screen-xl mx-auto p-4 md:p-8"> 
@@ -297,31 +289,22 @@ export default function StudentDashboard() {
               </div>
             </div>
 
+            {/* OYNATICI VE TAKİP ALANI */}
             {activeMaterial ? (
               <div className="space-y-6">
                 <div className={`video-aspect-container shadow-2xl rounded-[2rem] overflow-hidden bg-black border-4 border-gray-100 relative ${activeMaterial.content_type === 'form' ? 'min-h-[800px]' : ''}`}>
                   <iframe src={activeMaterial.embed_url} className="w-full h-full" allowFullScreen></iframe>
-                  
-                  {!completedMaterials.includes(activeMaterial.id) && activeMaterial.content_type !== 'form' && (
-                    <div className="absolute bottom-6 left-6 bg-black/70 backdrop-blur-md text-white px-5 py-3 rounded-2xl border border-white/20 flex items-center gap-4">
-                      <Timer size={24} className="text-primary animate-pulse" />
-                      <div>
-                         <p className="text-[10px] uppercase font-black text-gray-400 mb-0.5 tracking-widest">İlerleme Kaydediliyor</p>
-                         <p className="text-sm font-mono font-bold text-white">
-                            Kalan: {formatTime(watchTime)} / 10:00
-                         </p>
-                      </div>
-                    </div>
-                  )}
+                  {/* İlerleme kaydediliyor göstergesi buradan kaldırıldı */}
                 </div>
 
+                {/* Test/Form Onay Alanı */}
                 {activeMaterial.content_type === 'form' && !completedMaterials.includes(activeMaterial.id) && (
                   <div className="bg-blue-50 border border-blue-200 p-8 rounded-[2rem] flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
                     <div className="flex items-center gap-4 text-blue-900">
                       <div className="bg-blue-600 p-3 rounded-2xl text-white shadow-lg">
                         <FileSpreadsheet size={24} />
                       </div>
-                      <p className="font-bold text-lg leading-snug">Testi yukarıdaki formdan çözüp &quot;Gönder&quot; butonuna bastıktan sonra aşağıdaki butona tıklayın.</p>
+                      <p className="font-bold text-lg leading-snug">Testi yukarıdaki formdan çözüp "Gönder" butonuna bastıktan sonra aşağıdaki butona tıklayın.</p>
                     </div>
                     <button 
                       onClick={() => handleCompleteMaterial(activeMaterial.id)}
