@@ -7,12 +7,16 @@ import {
   FileText, 
   ChevronRight, 
   LogOut, 
-  Music,
-  Video,
-  FileSpreadsheet,
-  CheckCircle2,
-  Timer,
-  CheckCircle
+  Video, 
+  FileSpreadsheet, 
+  CheckCircle2, 
+  Timer, 
+  CheckCircle,
+  MessageSquare,
+  Send,
+  X,
+  Bot,
+  User
 } from 'lucide-react';
 
 interface Material {
@@ -45,12 +49,51 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [completedMaterials, setCompletedMaterials] = useState<number[]>([]);
   
-  // Arka plan takip süresi (10 Dakika = 600 Saniye)
+  // AI CHAT STATE'LERİ
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInput, setChatInput] = useState("");
+  const [messages, setMessages] = useState<{role: 'user' | 'bot', content: string}[]>([
+    { role: 'bot', content: 'Merhaba! Ben BÜ-LMS Yapay Zeka asistanıyım. Sana nasıl yardımcı olabilirim?' }
+  ]);
+  const [isTyping, setIsTyping] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Arka plan takip süresi
   const [watchTime, setWatchTime] = useState(0);
   const watchThreshold = 1200; 
 
   const trackingInterval = useRef<NodeJS.Timeout | null>(null);
   const watchTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Mesajlar eklendikçe otomatik aşağı kaydır
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // AI MESAJ GÖNDERME FONKSİYONU - GÜNCELLENDİ (weekly_content_id eklendi)
+  const handleSendChatMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!chatInput.trim()) return;
+
+    const userMsg = chatInput;
+    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+    setChatInput("");
+    setIsTyping(true);
+
+    try {
+      // Backend'deki /contents/ai-chat/ endpoint'ine gidiyoruz
+      // Haftalık karne için hangi haftada olduğumuzu (selectedWeek.id) gönderiyoruz
+      const res = await api.post('/contents/ai-chat/', { 
+        message: userMsg,
+        weekly_content_id: selectedWeek?.id 
+      });
+      setMessages(prev => [...prev, { role: 'bot', content: res.data.response }]);
+    } catch (err) {
+      setMessages(prev => [...prev, { role: 'bot', content: 'Üzgünüm, şu an bağlantı kuramıyorum.' }]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
 
   // 1. VERİLERİ ÇEKME VE BİRLEŞTİRME
   const fetchContents = useCallback(async (isUpdate = false) => {
@@ -109,7 +152,7 @@ export default function StudentDashboard() {
     }
   };
 
-  // 3. AKILLI İZLEME TAKİBİ (Arka Planda Çalışır)
+  // 3. AKILLI İZLEME TAKİBİ
   useEffect(() => {
     if (watchTimerRef.current) clearInterval(watchTimerRef.current);
 
@@ -140,7 +183,7 @@ export default function StudentDashboard() {
     };
   }, [activeMaterial?.id, completedMaterials.length]);
 
-  // 4. PING SİSTEMİ (Heartbeat)
+  // 4. PING SİSTEMİ
   useEffect(() => {
     if (selectedWeek) {
       if (trackingInterval.current) clearInterval(trackingInterval.current);
@@ -170,7 +213,7 @@ export default function StudentDashboard() {
   );
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden font-roboto">
+    <div className="flex h-screen bg-gray-50 overflow-hidden font-roboto relative">
       {/* SOL MENÜ */}
       <aside className="w-80 bg-secondary shadow-2xl flex flex-col border-r border-gray-800">
         <div className="p-6 border-b border-gray-700 bg-black/20 text-center">
@@ -294,7 +337,6 @@ export default function StudentDashboard() {
               <div className="space-y-6">
                 <div className={`video-aspect-container shadow-2xl rounded-[2rem] overflow-hidden bg-black border-4 border-gray-100 relative ${activeMaterial.content_type === 'form' ? 'min-h-[800px]' : ''}`}>
                   <iframe src={activeMaterial.embed_url} className="w-full h-full" allowFullScreen></iframe>
-                  {/* İlerleme kaydediliyor göstergesi buradan kaldırıldı */}
                 </div>
 
                 {/* Test/Form Onay Alanı */}
@@ -304,7 +346,7 @@ export default function StudentDashboard() {
                       <div className="bg-blue-600 p-3 rounded-2xl text-white shadow-lg">
                         <FileSpreadsheet size={24} />
                       </div>
-                      <p className="font-bold text-lg leading-snug">Testi yukarıdaki formdan çözüp "Gönder" butonuna bastıktan sonra aşağıdaki butona tıklayın.</p>
+                      <p className="font-bold text-lg leading-snug">Testi yukarıdaki formdan çözüp &quot;Gönder&quot; butonuna bastıktan sonra aşağıdaki butona tıklayın.</p>
                     </div>
                     <button 
                       onClick={() => handleCompleteMaterial(activeMaterial.id)}
@@ -344,6 +386,81 @@ export default function StudentDashboard() {
           </div>
         )}
       </main>
+
+      {/* --- YAPAY ZEKA SOHBET BALONCUĞU --- */}
+      <div className="fixed bottom-8 right-8 z-[999] flex flex-col items-end">
+        {isChatOpen && (
+          <div className="w-[350px] h-[500px] bg-white rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 mb-4 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
+            {/* Header */}
+            <div className="bg-secondary p-5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="bg-primary p-2 rounded-xl">
+                  <Bot size={20} className="text-white" />
+                </div>
+                <div>
+                  <h4 className="text-white text-xs font-black tracking-widest uppercase">AI Asistan</h4>
+                  <p className="text-[10px] text-green-400 font-bold">Online</p>
+                </div>
+              </div>
+              <button onClick={() => setIsChatOpen(false)} className="text-gray-400 hover:text-white transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50/50 custom-scrollbar">
+              {messages.map((msg, idx) => (
+                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] p-3 rounded-2xl text-xs font-medium ${
+                    msg.role === 'user' 
+                    ? 'bg-primary text-white rounded-tr-none' 
+                    : 'bg-white text-secondary shadow-sm rounded-tl-none border border-gray-100'
+                  }`}>
+                    {msg.content}
+                  </div>
+                </div>
+              ))}
+              {isTyping && (
+                <div className="flex justify-start">
+                  <div className="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm flex gap-1">
+                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce"></span>
+                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce delay-75"></span>
+                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce delay-150"></span>
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Input Form */}
+            <form onSubmit={handleSendChatMessage} className="p-4 bg-white border-t border-gray-100 flex gap-2">
+              <input
+                type="text"
+                placeholder="Bir soru sor..."
+                className="flex-1 bg-gray-100 rounded-xl px-4 py-2 text-xs outline-none focus:ring-1 focus:ring-primary transition-all text-secondary"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+              />
+              <button 
+                type="submit" 
+                className="bg-primary text-white p-2 rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-red-500/20"
+              >
+                <Send size={18} />
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* Floating Button */}
+        <button
+          onClick={() => setIsChatOpen(!isChatOpen)}
+          className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 ${
+            isChatOpen ? 'bg-secondary text-white' : 'bg-primary text-white'
+          }`}
+        >
+          {isChatOpen ? <X size={28} /> : <Bot size={28} />}
+        </button>
+      </div>
     </div>
   );
 }
