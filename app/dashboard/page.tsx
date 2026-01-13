@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '@/lib/api';
 import { 
   PlayCircle, 
@@ -64,13 +64,16 @@ export default function StudentDashboard() {
 
   const trackingInterval = useRef<NodeJS.Timeout | null>(null);
   const watchTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // İlk yükleme kontrolü için ref
+  const isInitialMount = useRef(true);
 
   // Mesajlar eklendikçe otomatik aşağı kaydır
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // AI MESAJ GÖNDERME FONKSİYONU - GÜNCELLENDİ (weekly_content_id eklendi)
+  // AI MESAJ GÖNDERME FONKSİYONU
   const handleSendChatMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
@@ -81,8 +84,6 @@ export default function StudentDashboard() {
     setIsTyping(true);
 
     try {
-      // Backend'deki /contents/ai-chat/ endpoint'ine gidiyoruz
-      // Haftalık karne için hangi haftada olduğumuzu (selectedWeek.id) gönderiyoruz
       const res = await api.post('/contents/ai-chat/', { 
         message: userMsg,
         weekly_content_id: selectedWeek?.id 
@@ -95,8 +96,8 @@ export default function StudentDashboard() {
     }
   };
 
-  // 1. VERİLERİ ÇEKME VE BİRLEŞTİRME
-  const fetchContents = useCallback(async (isUpdate = false) => {
+  // 1. VERİLERİ ÇEKME (SADECE İLK YÜKLEMEDE selectedWeek AYARLA)
+  const fetchContents = async (isUpdate = false) => {
     try {
       const [contentRes, progressRes, completedMatsRes] = await Promise.all([
         api.get('/contents/list/'),
@@ -118,33 +119,47 @@ export default function StudentDashboard() {
         };
       });
 
-      const sortedData = mergedData.sort((a, b) => a.week_number - b.week_number);
-      setContents(sortedData);
+      setContents(mergedData);
       
-      if (!isUpdate && sortedData.length > 0 && !selectedWeek) {
-        setSelectedWeek(sortedData[0]);
-        if (sortedData[0].materials.length > 0) setActiveMaterial(sortedData[0].materials[0]);
+      // SADECE İLK YÜKLEMEDE OTOMATIK SEÇİM YAP
+      if (isInitialMount.current && mergedData.length > 0 && !selectedWeek) {
+        const firstWeek = mergedData.sort((a,b) => a.week_number - b.week_number)[0];
+        setSelectedWeek(firstWeek);
+        if (firstWeek.materials.length > 0) setActiveMaterial(firstWeek.materials[0]);
+        isInitialMount.current = false;
       } 
-      else if (selectedWeek) {
-        const updated = sortedData.find((c: WeeklyContent) => c.id === selectedWeek.id);
-        if (updated) setSelectedWeek(updated);
+      // GÜNCELLEME SIRASINDA MEVCUT SEÇİLİ HAFTAYI GÜNCELLE
+      else if (isUpdate && selectedWeek) {
+        const updated = mergedData.find((c: WeeklyContent) => c.id === selectedWeek.id);
+        if (updated) {
+          setSelectedWeek(updated);
+          // Aktif materyali de güncelle
+          if (activeMaterial) {
+            const updatedMaterial = updated.materials.find(m => m.id === activeMaterial.id);
+            if (updatedMaterial) setActiveMaterial(updatedMaterial);
+          }
+        }
       }
     } catch (err) {
       console.error("Veri çekme hatası:", err);
     } finally {
       setLoading(false);
     }
-  }, [selectedWeek]);
+  };
 
+  // İLK YÜKLEME
   useEffect(() => {
     fetchContents();
-  }, [fetchContents]);
+  }, []);
 
   // 2. MATERYAL TAMAMLAMA İŞLEMİ
   const handleCompleteMaterial = async (materialId: number) => {
     try {
       await api.post('/contents/complete-material/', { material_id: materialId });
-      if (watchTimerRef.current) clearInterval(watchTimerRef.current);
+      if (watchTimerRef.current) {
+        clearInterval(watchTimerRef.current);
+        watchTimerRef.current = null;
+      }
       setWatchTime(0);
       await fetchContents(true);
     } catch (err) {
@@ -154,7 +169,11 @@ export default function StudentDashboard() {
 
   // 3. AKILLI İZLEME TAKİBİ
   useEffect(() => {
-    if (watchTimerRef.current) clearInterval(watchTimerRef.current);
+    // Önceki timer'ı temizle
+    if (watchTimerRef.current) {
+      clearInterval(watchTimerRef.current);
+      watchTimerRef.current = null;
+    }
 
     if (activeMaterial && 
         (activeMaterial.content_type === 'video' || activeMaterial.content_type === 'podcast') && 
@@ -167,7 +186,6 @@ export default function StudentDashboard() {
           const nextTime = prev + 1;
           if (nextTime >= watchThreshold) {
             handleCompleteMaterial(activeMaterial.id);
-            if (watchTimerRef.current) clearInterval(watchTimerRef.current);
             return 0;
           }
           return nextTime;
@@ -179,25 +197,40 @@ export default function StudentDashboard() {
     }
 
     return () => {
-      if (watchTimerRef.current) clearInterval(watchTimerRef.current);
+      if (watchTimerRef.current) {
+        clearInterval(watchTimerRef.current);
+        watchTimerRef.current = null;
+      }
     };
-  }, [activeMaterial?.id, completedMaterials.length]);
+  }, [activeMaterial?.id, completedMaterials]);
 
   // 4. PING SİSTEMİ
   useEffect(() => {
+    if (trackingInterval.current) {
+      clearInterval(trackingInterval.current);
+      trackingInterval.current = null;
+    }
+    
     if (selectedWeek) {
-      if (trackingInterval.current) clearInterval(trackingInterval.current);
       const sendPing = async () => {
         try {
           await api.post('/contents/track-activity/', {
             weekly_content_id: selectedWeek.id,
             seconds: 30 
           });
-        } catch (err) { console.error("Ping hatası"); }
+        } catch (err) { 
+          console.error("Ping hatası"); 
+        }
       };
       trackingInterval.current = setInterval(sendPing, 30000);
     }
-    return () => { if (trackingInterval.current) clearInterval(trackingInterval.current); };
+    
+    return () => { 
+      if (trackingInterval.current) {
+        clearInterval(trackingInterval.current);
+        trackingInterval.current = null;
+      }
+    };
   }, [selectedWeek?.id]);
 
   const handleLogout = () => {
@@ -205,16 +238,26 @@ export default function StudentDashboard() {
     window.location.href = '/login';
   };
 
+  // HAFTA SEÇİMİ FONKSİYONU
+  const handleWeekSelection = (weekData: WeeklyContent) => {
+    setSelectedWeek(weekData);
+    if (weekData.materials.length > 0) {
+      setActiveMaterial(weekData.materials[0]);
+    } else {
+      setActiveMaterial(null);
+    }
+  };
+
   if (loading) return (
     <div className="flex min-h-screen items-center justify-center bg-white flex-col gap-4">
       <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-      <p className="text-primary font-bold tracking-widest animate-pulse">YÜKLENİYOR...</p>
+      <p className="text-primary font-bold tracking-widest animate-pulse uppercase">YÜKLENİYOR...</p>
     </div>
   );
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-roboto relative">
-      {/* SOL MENÜ */}
+      {/* SOL MENÜ - SABİT DÖNGÜ (TASARIM GERİ GELDİ) */}
       <aside className="w-80 bg-secondary shadow-2xl flex flex-col border-r border-gray-800">
         <div className="p-6 border-b border-gray-700 bg-black/20 text-center">
           <h2 className="logo-text text-xl text-white tracking-widest text-primary font-bold uppercase">BÜ-LMS</h2>
@@ -222,21 +265,16 @@ export default function StudentDashboard() {
         </div>
         
         <nav className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
-          {Array.from({ length: 14 }, (_, i) => i + 1).map((weekNum) => {
-            const weekData = contents.find((c: WeeklyContent) => c.week_number === weekNum);
-            const isActive = selectedWeek?.week_number === weekNum;
+          {[1,2,3,4,5,6,7,8,9,10,11,12,13,14].map((num) => {
+            const weekData = contents.find((c) => c.week_number === num);
+            const isActive = selectedWeek?.week_number === num;
             const isFinished = weekData?.is_completed;
 
             return (
               <button
-                key={weekNum}
+                key={`sidebar-week-${num}`}
                 disabled={!weekData}
-                onClick={() => {
-                   if(weekData) {
-                      setSelectedWeek(weekData);
-                      if(weekData.materials.length > 0) setActiveMaterial(weekData.materials[0]);
-                   }
-                }}
+                onClick={() => weekData && handleWeekSelection(weekData)}
                 className={`w-full flex items-center justify-between p-4 rounded-xl transition-all border ${
                   isActive 
                     ? 'bg-primary border-primary text-white shadow-lg scale-[1.02]' 
@@ -244,7 +282,7 @@ export default function StudentDashboard() {
                       ? 'bg-green-600/20 border-green-500/40 text-green-400 hover:bg-green-600/30'
                       : weekData 
                         ? 'bg-gray-800/50 border-gray-700 text-gray-300 hover:bg-gray-700' 
-                        : 'bg-transparent border-dashed border-gray-700 text-gray-600 cursor-not-allowed'
+                        : 'bg-transparent border-dashed border-gray-700 text-gray-600 cursor-not-allowed opacity-40'
                 }`}
               >
                 <div className="flex items-center gap-3">
@@ -252,11 +290,11 @@ export default function StudentDashboard() {
                     <CheckCircle2 size={18} className="text-green-400" />
                   ) : (
                     <span className={`text-xs font-bold ${isActive ? 'text-white' : 'text-gray-500'}`}>
-                      {weekNum < 10 ? `0${weekNum}` : weekNum}
+                      {num < 10 ? `0${num}` : num}
                     </span>
                   )}
                   <div className="text-left">
-                    <p className="text-sm font-semibold">Hafta {weekNum}</p>
+                    <p className="text-sm font-semibold">Hafta {num}</p>
                     {weekData && (
                       <p className={`text-[10px] font-bold ${isFinished ? 'text-green-300' : 'text-gray-500'}`}>
                         %{weekData.progress || 0} BİTTİ
@@ -270,12 +308,12 @@ export default function StudentDashboard() {
           })}
         </nav>
 
-        <button onClick={handleLogout} className="p-6 border-t border-gray-700 flex items-center justify-center gap-2 text-gray-400 hover:text-primary transition-colors font-bold text-xs tracking-widest">
+        <button onClick={handleLogout} className="p-6 border-t border-gray-700 flex items-center justify-center gap-2 text-gray-400 hover:text-primary transition-colors font-bold text-xs tracking-widest uppercase">
           <LogOut size={16} /> GÜVENLİ ÇIKIŞ
         </button>
       </aside>
 
-      {/* ANA İÇERİK ALANI */}
+      {/* ANA İÇERİK ALANI (ZENGİN TASARIM) */}
       <main className="flex-1 overflow-y-auto bg-white custom-scrollbar">
         {selectedWeek ? (
           <div className="max-w-screen-xl mx-auto p-4 md:p-8"> 
@@ -332,14 +370,12 @@ export default function StudentDashboard() {
               </div>
             </div>
 
-            {/* OYNATICI VE TAKİP ALANI */}
             {activeMaterial ? (
               <div className="space-y-6">
                 <div className={`video-aspect-container shadow-2xl rounded-[2rem] overflow-hidden bg-black border-4 border-gray-100 relative ${activeMaterial.content_type === 'form' ? 'min-h-[800px]' : ''}`}>
                   <iframe src={activeMaterial.embed_url} className="w-full h-full" allowFullScreen></iframe>
                 </div>
 
-                {/* Test/Form Onay Alanı */}
                 {activeMaterial.content_type === 'form' && !completedMaterials.includes(activeMaterial.id) && (
                   <div className="bg-blue-50 border border-blue-200 p-8 rounded-[2rem] flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
                     <div className="flex items-center gap-4 text-blue-900">
@@ -364,7 +400,7 @@ export default function StudentDashboard() {
                 )}
               </div>
             ) : (
-              <div className="bg-gray-50 rounded-3xl p-24 text-center border-4 border-dashed border-gray-100 text-gray-400 font-bold uppercase tracking-widest">
+              <div className="bg-gray-50 rounded-3xl p-24 text-center border-4 border-dashed border-gray-100 text-gray-400 font-bold uppercase tracking-widest italic">
                 Henüz materyal eklenmemiştir.
               </div>
             )}
@@ -382,16 +418,15 @@ export default function StudentDashboard() {
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-gray-200">
             <PlayCircle size={100} strokeWidth={0.5} className="mb-6 animate-pulse opacity-20" />
-            <p className="text-2xl font-black tracking-tighter uppercase opacity-30">Lütfen Bir Eğitim Haftası Seçin</p>
+            <p className="text-2xl font-black tracking-tighter uppercase opacity-30 tracking-widest">Lütfen Bir Eğitim Haftası Seçin</p>
           </div>
         )}
       </main>
 
-      {/* --- YAPAY ZEKA SOHBET BALONCUĞU --- */}
+      {/* --- AI CHAT PANELİ (TÜM DETAYLARLA) --- */}
       <div className="fixed bottom-8 right-8 z-[999] flex flex-col items-end">
         {isChatOpen && (
           <div className="w-[350px] h-[500px] bg-white rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 mb-4 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
-            {/* Header */}
             <div className="bg-secondary p-5 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="bg-primary p-2 rounded-xl">
@@ -399,7 +434,7 @@ export default function StudentDashboard() {
                 </div>
                 <div>
                   <h4 className="text-white text-xs font-black tracking-widest uppercase">AI Asistan</h4>
-                  <p className="text-[10px] text-green-400 font-bold">Online</p>
+                  <p className="text-[10px] text-green-400 font-bold italic">Online</p>
                 </div>
               </div>
               <button onClick={() => setIsChatOpen(false)} className="text-gray-400 hover:text-white transition-colors">
@@ -407,14 +442,13 @@ export default function StudentDashboard() {
               </button>
             </div>
 
-            {/* Messages */}
             <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50/50 custom-scrollbar">
               {messages.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] p-3 rounded-2xl text-xs font-medium ${
+                <div key={`chat-msg-${idx}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] p-3 rounded-2xl text-xs font-medium shadow-sm ${
                     msg.role === 'user' 
-                    ? 'bg-primary text-white rounded-tr-none' 
-                    : 'bg-white text-secondary shadow-sm rounded-tl-none border border-gray-100'
+                    ? 'bg-primary text-white rounded-tr-none shadow-red-500/10' 
+                    : 'bg-white text-secondary rounded-tl-none border border-gray-100'
                   }`}>
                     {msg.content}
                   </div>
@@ -422,17 +456,16 @@ export default function StudentDashboard() {
               ))}
               {isTyping && (
                 <div className="flex justify-start">
-                  <div className="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm flex gap-1">
-                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce"></span>
-                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce delay-75"></span>
-                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce delay-150"></span>
+                  <div className="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm flex gap-1 animate-pulse">
+                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
+                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
+                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
                   </div>
                 </div>
               )}
               <div ref={chatEndRef} />
             </div>
 
-            {/* Input Form */}
             <form onSubmit={handleSendChatMessage} className="p-4 bg-white border-t border-gray-100 flex gap-2">
               <input
                 type="text"
@@ -451,7 +484,6 @@ export default function StudentDashboard() {
           </div>
         )}
 
-        {/* Floating Button */}
         <button
           onClick={() => setIsChatOpen(!isChatOpen)}
           className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 ${
