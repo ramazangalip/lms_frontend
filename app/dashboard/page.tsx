@@ -19,7 +19,8 @@ import {
   BookOpen,
   RefreshCcw,
   Sparkles,
-  Lock
+  Lock,
+  Menu
 } from 'lucide-react';
 
 // --- ARAYÜZ TANIMLAMALARI ---
@@ -106,6 +107,7 @@ export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
   const [completedMaterials, setCompletedMaterials] = useState<number[]>([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // --- QUIZ STATE'LERİ ---
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
@@ -134,20 +136,23 @@ export default function StudentDashboard() {
   const watchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialMount = useRef(true);
 
-  // --- YENİ: SAYFA YENİLENSE DE SKORLARI GETİREN FONKSİYON ---
+  // --- SAYFA YENİLENSE DE SKORLARI GETİREN FONKSİYON ---
   const fetchPreviousAttempt = async (quizId: number) => {
+    if (!quizId) return;
     try {
       const res = await api.get(`/contents/quiz-last-attempt/${quizId}/`);
-      if (res.data) {
+      if (res.data && res.data.id) {
         setQuizResult({
           score: res.data.score,
-          correct: res.data.correct_answers,
-          wrong: res.data.wrong_answers
+          correct: res.data.correct_answers || res.data.correct,
+          wrong: res.data.wrong_answers || res.data.wrong
         });
         setCurrentAttemptId(res.data.id);
+      } else {
+        setQuizResult(null);
+        setCurrentAttemptId(null);
       }
     } catch (err) {
-      console.error("Eski sınav sonucu çekilemedi:", err);
       setQuizResult(null);
       setCurrentAttemptId(null);
     }
@@ -155,8 +160,13 @@ export default function StudentDashboard() {
 
   // Materyal her değiştiğinde eğer o materyal çözülmüşse eski sonucu getir
   useEffect(() => {
-    if (activeMaterial?.content_type === 'form' && completedMaterials.includes(activeMaterial.id)) {
-      fetchPreviousAttempt(activeMaterial.quiz?.id || 0);
+    if (activeMaterial?.content_type === 'form' && activeMaterial.quiz?.id) {
+      if (completedMaterials.includes(activeMaterial.id)) {
+        fetchPreviousAttempt(activeMaterial.quiz.id);
+      } else {
+        setQuizResult(null);
+        setCurrentAttemptId(null);
+      }
     } else {
       setQuizResult(null);
       setCurrentAttemptId(null);
@@ -214,7 +224,7 @@ export default function StudentDashboard() {
       setContents(mergedData);
       
       if (isInitialMount.current && mergedData.length > 0 && !selectedWeek) {
-        const firstWeek = mergedData.sort((a,b) => a.week_number - b.week_number)[0];
+        const firstWeek = mergedData.sort((a: any, b: any) => a.week_number - b.week_number)[0];
         setSelectedWeek(firstWeek);
         if (firstWeek.materials.length > 0) setActiveMaterial(firstWeek.materials[0]);
         isInitialMount.current = false;
@@ -284,7 +294,7 @@ export default function StudentDashboard() {
       await fetchContents(true);
     } catch (err) {
       console.error("Quiz submit hatası:", err);
-      alert("Bu testi daha önce çözmüş olabilirsiniz veya bir hata oluştu.");
+      alert("Bu testi daha önce çözmüş olabilirsiniz.");
     } finally {
       setQuizSubmitting(false);
     }
@@ -388,6 +398,7 @@ export default function StudentDashboard() {
     } else {
       setActiveMaterial(null);
     }
+    setIsSidebarOpen(false); // Seçim yapınca mobilde sidebarı kapat
   };
 
   if (loading) return (
@@ -399,11 +410,31 @@ export default function StudentDashboard() {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-roboto relative">
-      {/* SOL MENÜ */}
-      <aside className="w-80 bg-secondary shadow-2xl flex flex-col border-r border-gray-800">
-        <div className="p-6 border-b border-gray-700 bg-black/20 text-center">
-          <h2 className="logo-text text-xl text-white tracking-widest text-primary font-bold uppercase">BÜ-LMS</h2>
-          <p className="text-[10px] text-gray-400 uppercase mt-1 tracking-tighter text-center">ÖĞRENCİ PANELİ</p>
+      
+      {/* MOBİL ÜST BAR (Hamburger Menü İçin) */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-secondary flex items-center justify-between px-6 z-[60] shadow-md">
+        <h2 className="text-white font-black uppercase text-sm tracking-widest">BÜ-LMS</h2>
+        <button 
+          onClick={() => setIsSidebarOpen(true)}
+          className="text-white p-2 bg-gray-800 rounded-lg"
+        >
+          <Menu size={24} />
+        </button>
+      </div>
+
+      {/* SOL MENÜ (SIDEBAR) */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-[100] w-80 bg-secondary shadow-2xl flex flex-col border-r border-gray-800 transition-transform duration-300 transform
+        lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="p-6 border-b border-gray-700 bg-black/20 text-center flex items-center justify-between">
+          <div className="w-full">
+            <h2 className="logo-text text-xl text-white tracking-widest text-primary font-bold uppercase">BÜ-LMS</h2>
+            <p className="text-[10px] text-gray-400 uppercase mt-1 tracking-tighter text-center">ÖĞRENCİ PANELİ</p>
+          </div>
+          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-400 absolute right-4 top-6">
+            <X size={24} />
+          </button>
         </div>
         
         <nav className="flex-1 overflow-y-auto p-4 space-y-2 custom-scrollbar">
@@ -456,9 +487,9 @@ export default function StudentDashboard() {
       </aside>
 
       {/* ANA İÇERİK ALANI */}
-      <main className="flex-1 overflow-y-auto bg-white custom-scrollbar">
+      <main className="flex-1 overflow-y-auto bg-white custom-scrollbar pt-16 lg:pt-0">
         {selectedWeek ? (
-          <div className="max-w-screen-xl mx-auto p-4 md:p-8"> 
+          <div className="max-w-screen-xl mx-auto p-4 md:p-8 lg:p-12"> 
             <div className="mb-8 border-b pb-8 border-gray-100">
               <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="flex-1">
@@ -472,11 +503,11 @@ export default function StudentDashboard() {
                       </span>
                     )}
                   </div>
-                  <h1 className="text-4xl font-extrabold text-secondary leading-tight tracking-tight mb-4">
+                  <h1 className="text-2xl md:text-4xl font-extrabold text-secondary leading-tight tracking-tight mb-4">
                     {selectedWeek.title}
                   </h1>
                   
-                  <div className="w-full max-md bg-gray-100 h-2.5 rounded-full overflow-hidden border border-gray-200 shadow-inner">
+                  <div className="w-full max-w-md bg-gray-100 h-2.5 rounded-full overflow-hidden border border-gray-200 shadow-inner">
                     <div 
                       className={`h-full transition-all duration-700 ease-out ${selectedWeek.is_completed ? 'bg-green-500' : 'bg-primary'}`} 
                       style={{ width: `${selectedWeek.progress || 0}%` }}
@@ -487,14 +518,15 @@ export default function StudentDashboard() {
                   </p>
                 </div>
 
-                <div className="flex bg-gray-100 p-1.5 rounded-2xl shadow-inner border border-gray-200">
+                {/* Materyal Seçici: Mobilde Yana Kaydırılabilir */}
+                <div className="flex bg-gray-100 p-1.5 rounded-2xl shadow-inner border border-gray-200 overflow-x-auto no-scrollbar max-w-full">
                   {selectedWeek.materials.map((mat) => (
                     <button
                       key={mat.id}
                       onClick={() => {
                         setActiveMaterial(mat);
                       }}
-                      className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${
+                      className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all whitespace-nowrap ${
                         activeMaterial?.id === mat.id
                           ? 'bg-white text-primary shadow-md scale-105'
                           : completedMaterials.includes(mat.id)
@@ -519,57 +551,55 @@ export default function StudentDashboard() {
             {activeMaterial ? (
               <div className="space-y-8 animate-in fade-in duration-500">
                 {activeMaterial.content_type !== 'form' ? (
-                  <div className="video-aspect-container shadow-2xl rounded-[2.5rem] overflow-hidden bg-black border-4 border-gray-100 relative min-h-[500px]">
-                    <iframe src={activeMaterial.embed_url} className="w-full h-full" allowFullScreen></iframe>
+                  <div className="relative aspect-video shadow-2xl rounded-2xl md:rounded-[2.5rem] overflow-hidden bg-black border-4 border-gray-100">
+                    <iframe src={activeMaterial.embed_url} className="absolute inset-0 w-full h-full" allowFullScreen></iframe>
                   </div>
                 ) : (
-                  <div className="bg-white border border-gray-100 rounded-[2.5rem] shadow-2xl overflow-hidden">
-                    <div className="bg-secondary p-8 flex items-center justify-between">
+                  <div className="bg-white border border-gray-100 rounded-2xl md:rounded-[2.5rem] shadow-2xl overflow-hidden">
+                    <div className="bg-secondary p-6 md:p-8 flex items-center justify-between text-white">
                       <div className="flex items-center gap-4">
                         <div className="bg-primary p-3 rounded-2xl">
                           <ListChecks className="text-white" size={24}/>
                         </div>
                         <div>
-                          <h2 className="text-white font-black text-xl uppercase tracking-tighter">
+                          <h2 className="text-white font-black text-lg md:text-xl uppercase tracking-tighter">
                             {activeMaterial.quiz?.title || activeMaterial.title}
                           </h2>
-                          <p className="text-gray-400 text-xs font-medium uppercase tracking-widest">
+                          <p className="text-gray-400 text-[10px] font-medium uppercase tracking-widest">
                             {activeMaterial.quiz?.questions.length || 0} Soru Bilgi Testi
                           </p>
                         </div>
                       </div>
                       {completedMaterials.includes(activeMaterial.id) && (
-                        <div className="flex items-center gap-2 bg-green-500/20 text-green-400 px-4 py-2 rounded-xl border border-green-500/30 font-black text-xs">
+                        <div className="hidden sm:flex items-center gap-2 bg-green-500/20 text-green-400 px-4 py-2 rounded-xl border border-green-500/30 font-black text-xs uppercase">
                           <CheckCircle2 size={16}/> TEST TAMAMLANDI
                         </div>
                       )}
                     </div>
 
-                    <div className="p-8 space-y-10">
+                    <div className="p-4 md:p-8 space-y-10">
                       {/* --- TEST KİLİTLİ VEYA SONUÇ EKRANI --- */}
                       {(completedMaterials.includes(activeMaterial.id) || quizResult) ? (
-                        <div className="text-center py-12 space-y-6 animate-in zoom-in-95 duration-500">
+                        <div className="text-center py-8 md:py-12 space-y-6 animate-in zoom-in-95 duration-500">
+                          <div className="w-16 h-16 md:w-24 md:h-24 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto border-4 border-green-100 shadow-xl">
+                            <Award size={48} />
+                          </div>
                           {quizResult ? (
                             <>
-                              <div className="w-24 h-24 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto border-4 border-green-100 shadow-xl">
-                                <Award size={48} />
-                              </div>
-                              <div>
-                                <h3 className="text-3xl font-black text-secondary uppercase tracking-tighter">Tebrikler!</h3>
-                                <p className="text-gray-500 font-medium">Sınav sonucun başarıyla kaydedildi.</p>
-                              </div>
-                              <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
-                                <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100">
+                              <h3 className="text-2xl md:text-3xl font-black text-secondary uppercase tracking-tighter">Tebrikler!</h3>
+                              <p className="text-gray-500 font-medium">Sınav sonucun başarıyla kaydedildi.</p>
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-md mx-auto px-4">
+                                <div className="bg-gray-50 p-4 rounded-3xl border text-center">
                                   <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Puan</p>
-                                  <p className="text-2xl font-black text-secondary">%{quizResult.score}</p>
+                                  <p className="text-xl md:text-2xl font-black text-secondary">%{quizResult.score}</p>
                                 </div>
-                                <div className="bg-green-50 p-4 rounded-3xl border border-green-100">
+                                <div className="bg-green-50 p-4 rounded-3xl border border-green-100 text-center">
                                   <p className="text-[10px] font-black text-green-600 uppercase mb-1">Doğru</p>
-                                  <p className="text-2xl font-black text-green-600">{quizResult.correct}</p>
+                                  <p className="text-xl md:text-2xl font-black text-green-600">{quizResult.correct}</p>
                                 </div>
-                                <div className="bg-red-50 p-4 rounded-3xl border border-red-100">
+                                <div className="bg-red-50 p-4 rounded-3xl border border-red-100 text-center">
                                   <p className="text-[10px] font-black text-red-600 uppercase mb-1">Yanlış</p>
-                                  <p className="text-2xl font-black text-red-600">{quizResult.wrong}</p>
+                                  <p className="text-xl md:text-2xl font-black text-red-600">{quizResult.wrong}</p>
                                 </div>
                               </div>
                             </>
@@ -578,16 +608,15 @@ export default function StudentDashboard() {
                               <div className="w-20 h-20 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto">
                                 <Lock size={32} />
                               </div>
-                              <h3 className="text-xl font-black text-secondary uppercase">Bu Test Tamamlandı</h3>
-                              <p className="text-gray-400 text-sm max-w-xs mx-auto">Sonuçlar getiriliyor...</p>
+                              <h3 className="text-xl font-black text-secondary uppercase tracking-tight">Bu Test Tamamlandı</h3>
+                              <p className="text-gray-400 text-sm max-w-xs mx-auto text-xs uppercase font-bold animate-pulse">Skor verileri getiriliyor...</p>
                             </div>
                           )}
                           
-                          {/* AI ANALİZ BUTONU */}
                           <button 
                             onClick={handleFetchAIAnalysis}
                             disabled={!currentAttemptId}
-                            className="mt-6 mx-auto flex items-center gap-3 bg-secondary text-white px-10 py-5 rounded-[2rem] font-black text-xs tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl border border-gray-700 uppercase disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="mt-6 mx-auto flex items-center gap-3 bg-secondary text-white px-8 md:px-10 py-4 md:py-5 rounded-[2rem] font-black text-xs tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl border border-gray-700 uppercase disabled:opacity-50"
                           >
                             <Sparkles size={18} className="text-primary animate-pulse" /> Yapay Zeka Analizini Gör
                           </button>
@@ -597,10 +626,10 @@ export default function StudentDashboard() {
                         <>
                           {activeMaterial.quiz?.questions.map((q, qIdx) => (
                             <div key={q.id} className="question-block space-y-5">
-                              <h3 className="text-lg font-bold text-secondary flex gap-4">
+                              <h3 className="text-base md:text-lg font-bold text-secondary flex gap-3 leading-tight">
                                 <span className="text-primary font-black">0{qIdx + 1}.</span> {q.question_text}
                               </h3>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-10">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:pl-10">
                                 {q.options.map((opt) => (
                                   <button
                                     key={opt.id}
@@ -621,7 +650,7 @@ export default function StudentDashboard() {
                           <button 
                             onClick={handleQuizSubmit} 
                             disabled={quizSubmitting}
-                            className="w-full bg-secondary hover:bg-black text-white py-6 rounded-[2rem] font-black tracking-widest transition-all shadow-2xl flex items-center justify-center gap-3 active:scale-[0.98] disabled:bg-gray-300 uppercase mt-10"
+                            className="w-full bg-secondary hover:bg-black text-white py-4 md:py-6 rounded-[2rem] font-black tracking-widest transition-all shadow-2xl flex items-center justify-center gap-3 active:scale-[0.98] disabled:bg-gray-300 uppercase mt-10 text-xs md:text-sm"
                           >
                             <Send size={20} className="text-primary"/> 
                             {quizSubmitting ? "KONTROL EDİLİYOR..." : "SINAVI BİTİR VE PUANLA"}
@@ -634,9 +663,9 @@ export default function StudentDashboard() {
 
                 {/* FLASHCARDS SECTION */}
                 {selectedWeek.flashcards && selectedWeek.flashcards.length > 0 && (
-                  <div className="bg-gray-50 p-8 rounded-[2rem] border border-gray-100 space-y-8">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
+                  <div className="bg-gray-50 p-6 md:p-8 rounded-2xl md:rounded-[2rem] border border-gray-100 space-y-8">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left">
+                      <div className="flex flex-col md:flex-row items-center gap-4">
                         <div className="bg-primary p-3 rounded-2xl shadow-lg shadow-red-500/20 text-white">
                           <BookOpen size={24}/>
                         </div>
@@ -649,7 +678,7 @@ export default function StudentDashboard() {
                         <button 
                           onClick={() => setCurrentCardIndex(prev => Math.max(0, prev - 1))} 
                           disabled={currentCardIndex === 0}
-                          className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md disabled:opacity-30 border border-gray-100 hover:text-primary transition-all"
+                          className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md disabled:opacity-30 border border-gray-100"
                         >
                           <ChevronLeft size={20}/>
                         </button>
@@ -657,7 +686,7 @@ export default function StudentDashboard() {
                         <button 
                           onClick={() => setCurrentCardIndex(prev => Math.min(selectedWeek.flashcards.length - 1, prev + 1))} 
                           disabled={currentCardIndex === selectedWeek.flashcards.length - 1}
-                          className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md disabled:opacity-30 border border-gray-100 hover:text-primary transition-all"
+                          className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md disabled:opacity-30 border border-gray-100"
                         >
                           <ChevronRight size={20}/>
                         </button>
@@ -675,69 +704,63 @@ export default function StudentDashboard() {
                 )}
 
                 {/* DERS NOTLARI */}
-                <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl overflow-hidden">
-                  <div className="bg-gray-50/50 px-10 py-5 border-b border-gray-100 flex items-center gap-3">
+                <div className="bg-white rounded-2xl md:rounded-[2rem] border border-gray-100 shadow-xl overflow-hidden mb-10">
+                  <div className="bg-gray-50/50 px-6 md:px-10 py-5 border-b border-gray-100 flex items-center gap-3">
                     <FileText size={24} className="text-primary" />
                     <h3 className="font-black text-secondary uppercase tracking-widest text-xs">Akademik Ders Notları</h3>
                   </div>
-                  <div className="p-10 text-gray-600 leading-relaxed text-lg font-light italic">
+                  <div className="p-6 md:p-10 text-gray-600 leading-relaxed text-base md:text-lg font-light italic">
                     {selectedWeek.description || "Ders notu bulunmamaktadır."}
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="bg-gray-50 rounded-3xl p-24 text-center border-4 border-dashed border-gray-100 text-gray-400 font-bold uppercase tracking-widest italic">
+              <div className="bg-gray-50 rounded-3xl p-12 md:p-24 text-center border-4 border-dashed border-gray-100 text-gray-400 font-bold uppercase tracking-widest italic">
                 Henüz materyal eklenmemiştir.
               </div>
             )}
           </div>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-gray-200">
+          <div className="h-full flex flex-col items-center justify-center text-gray-200 p-8 text-center">
             <PlayCircle size={100} strokeWidth={0.5} className="mb-6 animate-pulse opacity-20" />
-            <p className="text-2xl font-black tracking-tighter uppercase opacity-30 tracking-widest">Lütfen Bir Eğitim Haftası Seçin</p>
+            <p className="text-xl md:text-2xl font-black tracking-tighter uppercase opacity-30 tracking-widest">Lütfen Bir Eğitim Haftası Seçin</p>
           </div>
         )}
       </main>
 
-      {/* --- AI ANALYSIS MODAL --- */}
+      {/* AI ANALYSIS MODAL */}
       {isAnalysisModalOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-secondary/80 backdrop-blur-md animate-in fade-in duration-300">
-          <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden animate-in zoom-in-95 duration-300 border-4 border-white">
-            <div className="bg-secondary p-8 flex items-center justify-between">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-secondary/80 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto">
+          <div className="bg-white w-full max-w-2xl rounded-3xl md:rounded-[3rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden animate-in zoom-in-95 duration-300 border-4 border-white my-auto flex flex-col">
+            <div className="bg-secondary p-6 md:p-8 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-4">
                 <div className="bg-primary p-3 rounded-2xl shadow-lg shadow-red-500/20">
                   <Bot className="text-white" size={24} />
                 </div>
                 <div>
-                  <h3 className="text-white font-black uppercase tracking-tighter text-xl">Akıllı Performans Analizi</h3>
+                  <h3 className="text-white font-black uppercase tracking-tighter text-lg md:text-xl">Akıllı Performans Analizi</h3>
                   <p className="text-primary text-[10px] font-bold uppercase tracking-widest">BÜ-LMS Yapay Zeka Servisi</p>
                 </div>
               </div>
-              <button 
-                onClick={() => setIsAnalysisModalOpen(false)} 
-                className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-primary transition-all"
-              >
+              <button onClick={() => setIsAnalysisModalOpen(false)} className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-primary transition-all">
                 <X size={20} />
               </button>
             </div>
             
-            <div className="p-10 min-h-[300px] max-h-[60vh] overflow-y-auto custom-scrollbar">
+            <div className="p-6 md:p-10 min-h-[300px] max-h-[60vh] overflow-y-auto custom-scrollbar flex-1">
               {isAnalysisLoading ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-6">
+                <div className="flex flex-col items-center justify-center py-20 gap-6 text-center">
                   <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                  <div className="text-center">
-                    <p className="text-secondary font-black text-lg uppercase tracking-widest animate-pulse">Analiz Yapılıyor...</p>
-                    <p className="text-gray-400 text-xs mt-2">Yapay zeka asistanı cevaplarını inceliyor ve sana özel bir yol haritası çıkarıyor.</p>
-                  </div>
+                  <p className="text-secondary font-black text-lg uppercase animate-pulse">Analiz Yapılıyor...</p>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  <div className="bg-red-50 border-l-8 border-primary p-8 rounded-3xl">
+                <div className="space-y-6 text-center md:text-left">
+                  <div className="bg-red-50 border-l-8 border-primary p-6 md:p-8 rounded-3xl">
                     <div className="flex items-center gap-2 mb-4 text-primary">
                       <Sparkles size={18} />
                       <span className="font-black text-xs uppercase tracking-widest">Kişiselleştirilmiş Eğitmen Notu</span>
                     </div>
-                    <p className="text-secondary font-medium leading-loose text-base whitespace-pre-line italic">
+                    <p className="text-secondary font-medium leading-loose text-sm md:text-base whitespace-pre-line italic">
                       {aiAnalysisFeedback}
                     </p>
                   </div>
@@ -745,10 +768,10 @@ export default function StudentDashboard() {
               )}
             </div>
 
-            <div className="p-8 bg-gray-50 border-t border-gray-100 flex justify-center">
+            <div className="p-6 md:p-8 bg-gray-50 border-t border-gray-100 flex justify-center shrink-0">
               <button 
                 onClick={() => setIsAnalysisModalOpen(false)}
-                className="bg-secondary hover:bg-black text-white px-12 py-4 rounded-2xl font-black text-xs tracking-widest transition-all shadow-xl uppercase"
+                className="w-full md:w-auto bg-secondary hover:bg-black text-white px-12 py-4 rounded-2xl font-black text-xs tracking-widest transition-all shadow-xl uppercase"
               >
                 Kapat ve Çalışmaya Devam Et
               </button>
@@ -758,28 +781,21 @@ export default function StudentDashboard() {
       )}
 
       {/* AI CHAT PANELİ */}
-      <div className="fixed bottom-8 right-8 z-[999] flex flex-col items-end">
+      <div className="fixed bottom-6 right-6 md:bottom-8 md:right-8 z-[999] flex flex-col items-end">
         {isChatOpen && (
-          <div className="w-[350px] h-[500px] bg-white rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 mb-4 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
-            <div className="bg-secondary p-5 flex items-center justify-between">
+          <div className="w-[280px] sm:w-[350px] h-[450px] md:h-[500px] bg-white rounded-3xl md:rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.15)] border border-gray-100 mb-4 flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
+            <div className="bg-secondary p-4 md:p-5 flex items-center justify-between text-white shadow-lg shrink-0">
               <div className="flex items-center gap-3">
-                <div className="bg-primary p-2 rounded-xl">
-                  <Bot size={20} className="text-white" />
-                </div>
-                <div>
-                  <h4 className="text-white text-xs font-black tracking-widest uppercase">AI Asistan</h4>
-                  <p className="text-[10px] text-green-400 font-bold italic">Online</p>
-                </div>
+                <div className="bg-primary p-2 rounded-xl shadow-md shadow-red-500/20"><Bot size={20} /></div>
+                <div><h4 className="text-xs font-black tracking-widest uppercase">AI Asistan</h4><p className="text-[9px] text-green-400 font-bold italic leading-none">Online</p></div>
               </div>
-              <button onClick={() => setIsChatOpen(false)} className="text-gray-400 hover:text-white transition-colors">
-                <X size={20} />
-              </button>
+              <button onClick={() => setIsChatOpen(false)} className="hover:text-primary transition-colors"><X size={20} /></button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50/50 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 bg-gray-50/50 custom-scrollbar">
               {messages.map((msg, idx) => (
-                <div key={`chat-msg-${idx}`} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] p-3 rounded-2xl text-xs font-medium shadow-sm ${
+                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[85%] p-3 rounded-2xl text-[11px] md:text-xs font-medium shadow-sm ${
                     msg.role === 'user' 
                     ? 'bg-primary text-white rounded-tr-none shadow-red-500/10' 
                     : 'bg-white text-secondary rounded-tl-none border border-gray-100'
@@ -791,40 +807,35 @@ export default function StudentDashboard() {
               {isTyping && (
                 <div className="flex justify-start">
                   <div className="bg-white p-3 rounded-2xl rounded-tl-none shadow-sm flex gap-1 animate-pulse">
-                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
-                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
-                    <span className="w-1.5 h-1.5 bg-gray-300 rounded-full"></span>
+                    <span className="w-1 h-1 md:w-1.5 md:h-1.5 bg-gray-300 rounded-full"></span>
+                    <span className="w-1 h-1 md:w-1.5 md:h-1.5 bg-gray-300 rounded-full"></span>
+                    <span className="w-1 h-1 md:w-1.5 md:h-1.5 bg-gray-300 rounded-full"></span>
                   </div>
                 </div>
               )}
               <div ref={chatEndRef} />
             </div>
 
-            <form onSubmit={handleSendChatMessage} className="p-4 bg-white border-t border-gray-100 flex gap-2">
+            <form onSubmit={handleSendChatMessage} className="p-3 md:p-4 bg-white border-t border-gray-100 flex gap-2 shrink-0">
               <input
                 type="text"
                 placeholder="Bir soru sor..."
-                className="flex-1 bg-gray-100 rounded-xl px-4 py-2 text-xs outline-none focus:ring-1 focus:ring-primary transition-all text-secondary"
+                className="flex-1 bg-gray-100 rounded-xl px-4 py-2 text-[11px] md:text-xs outline-none focus:ring-1 focus:ring-primary text-secondary"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
               />
-              <button 
-                type="submit" 
-                className="bg-primary text-white p-2 rounded-xl hover:scale-105 active:scale-95 transition-all shadow-lg shadow-red-500/20"
-              >
-                <Send size={18} />
-              </button>
+              <button type="submit" className="bg-primary text-white p-2 rounded-xl shadow-lg shadow-red-500/20 hover:scale-105 active:scale-95 transition-all"><Send size={18} /></button>
             </form>
           </div>
         )}
 
         <button
           onClick={() => setIsChatOpen(!isChatOpen)}
-          className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 hover:scale-110 active:scale-95 ${
+          className={`w-12 h-12 md:w-14 md:h-14 rounded-full flex items-center justify-center shadow-2xl transition-all hover:scale-110 active:scale-95 z-[1000] ${
             isChatOpen ? 'bg-secondary text-white' : 'bg-primary text-white'
           }`}
         >
-          {isChatOpen ? <X size={28} /> : <Bot size={28} />}
+          {isChatOpen ? <X size={24} /> : <Bot size={28} />}
         </button>
       </div>
     </div>
