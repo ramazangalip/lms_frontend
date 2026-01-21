@@ -9,20 +9,17 @@ import {
   ChevronLeft,
   LogOut, 
   Video, 
-  FileSpreadsheet, 
   CheckCircle2, 
-  Timer, 
-  CheckCircle,
-  MessageSquare,
   Send,
   X,
   Bot,
-  User,
   Award,
   ArrowRight,
   ListChecks,
   BookOpen,
-  RefreshCcw
+  RefreshCcw,
+  Sparkles,
+  Lock
 } from 'lucide-react';
 
 // --- ARAYÜZ TANIMLAMALARI ---
@@ -85,7 +82,6 @@ const Flashcard = ({ question, answer }: { question: string, answer: string }) =
       onClick={() => setIsFlipped(!isFlipped)}
     >
       <div className={`relative w-full h-full transition-all duration-700 [transform-style:preserve-3d] ${isFlipped ? '[transform:rotateY(180deg)]' : ''}`}>
-        {/* ÖN YÜZ */}
         <div className="absolute inset-0 w-full h-full bg-white border-2 border-gray-100 rounded-3xl shadow-sm flex flex-col items-center justify-center p-8 [backface-visibility:hidden]">
           <div className="bg-red-50 text-primary p-3 rounded-2xl mb-4"><BookOpen size={24} /></div>
           <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">SORU</span>
@@ -94,7 +90,6 @@ const Flashcard = ({ question, answer }: { question: string, answer: string }) =
             <RefreshCcw size={10} /> Cevabı Gör
           </div>
         </div>
-        {/* ARKA YÜZ */}
         <div className="absolute inset-0 w-full h-full bg-primary text-white rounded-3xl shadow-xl flex flex-col items-center justify-center p-8 [backface-visibility:hidden] [transform:rotateY(180deg)]">
           <span className="text-[10px] font-black text-red-200 uppercase tracking-widest mb-4">CEVAP</span>
           <p className="text-center font-medium text-base leading-relaxed">{answer}</p>
@@ -110,13 +105,18 @@ export default function StudentDashboard() {
   const [activeMaterial, setActiveMaterial] = useState<Material | null>(null);
   const [loading, setLoading] = useState(true);
   const [completedMaterials, setCompletedMaterials] = useState<number[]>([]);
-  
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
 
   // --- QUIZ STATE'LERİ ---
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const [quizResult, setQuizResult] = useState<{score: number, correct: number, wrong: number} | null>(null);
   const [quizSubmitting, setQuizSubmitting] = useState(false);
+  const [currentAttemptId, setCurrentAttemptId] = useState<number | null>(null);
+
+  // --- AI ANALYSIS STATE'LERİ ---
+  const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
+  const [aiAnalysisFeedback, setAiAnalysisFeedback] = useState<string | null>(null);
+  const [isAnalysisLoading, setIsAnalysisLoading] = useState(false);
 
   // AI CHAT STATE'LERİ
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -133,6 +133,35 @@ export default function StudentDashboard() {
   const trackingInterval = useRef<NodeJS.Timeout | null>(null);
   const watchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialMount = useRef(true);
+
+  // --- YENİ: SAYFA YENİLENSE DE SKORLARI GETİREN FONKSİYON ---
+  const fetchPreviousAttempt = async (quizId: number) => {
+    try {
+      const res = await api.get(`/contents/quiz-last-attempt/${quizId}/`);
+      if (res.data) {
+        setQuizResult({
+          score: res.data.score,
+          correct: res.data.correct_answers,
+          wrong: res.data.wrong_answers
+        });
+        setCurrentAttemptId(res.data.id);
+      }
+    } catch (err) {
+      console.error("Eski sınav sonucu çekilemedi:", err);
+      setQuizResult(null);
+      setCurrentAttemptId(null);
+    }
+  };
+
+  // Materyal her değiştiğinde eğer o materyal çözülmüşse eski sonucu getir
+  useEffect(() => {
+    if (activeMaterial?.content_type === 'form' && completedMaterials.includes(activeMaterial.id)) {
+      fetchPreviousAttempt(activeMaterial.quiz?.id || 0);
+    } else {
+      setQuizResult(null);
+      setCurrentAttemptId(null);
+    }
+  }, [activeMaterial?.id, completedMaterials]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -225,7 +254,6 @@ export default function StudentDashboard() {
     }
   };
 
-  // --- QUIZ GÖNDERME FONKSİYONU ---
   const handleQuizSubmit = async () => {
     if (!activeMaterial?.quiz) return;
     
@@ -237,7 +265,6 @@ export default function StudentDashboard() {
 
     setQuizSubmitting(true);
     try {
-      // Backend'in StudentAnswer tablosunu doldurması için gereken doğru JSON formatı
       const answers = Object.entries(selectedAnswers).map(([qId, oId]) => ({
         question_id: parseInt(qId),
         option_id: oId
@@ -250,14 +277,36 @@ export default function StudentDashboard() {
         correct: res.data.correct,
         wrong: res.data.wrong
       });
+
+      setCurrentAttemptId(res.data.attempt_id);
+      setCompletedMaterials(prev => [...prev, activeMaterial.id]);
       
-      // Materyal listesini ve ilerlemeyi güncelle
       await fetchContents(true);
     } catch (err) {
       console.error("Quiz submit hatası:", err);
-      alert("Sınav sonuçları gönderilirken bir hata oluştu.");
+      alert("Bu testi daha önce çözmüş olabilirsiniz veya bir hata oluştu.");
     } finally {
       setQuizSubmitting(false);
+    }
+  };
+
+  const handleFetchAIAnalysis = async () => {
+    if (!currentAttemptId) {
+        alert("Analiz edilecek sınav verisi bulunamadı. Lütfen sayfayı yenileyin.");
+        return;
+    }
+    
+    setIsAnalysisLoading(true);
+    setIsAnalysisModalOpen(true);
+    setAiAnalysisFeedback(null);
+
+    try {
+      const res = await api.get(`/contents/quiz-analysis/${currentAttemptId}/`);
+      setAiAnalysisFeedback(res.data.ai_feedback);
+    } catch (err) {
+      setAiAnalysisFeedback("Analiz şu an oluşturulamadı. Lütfen daha sonra tekrar deneyin.");
+    } finally {
+      setIsAnalysisLoading(false);
     }
   };
 
@@ -332,6 +381,7 @@ export default function StudentDashboard() {
     setSelectedWeek(weekData);
     setQuizResult(null);
     setSelectedAnswers({});
+    setCurrentAttemptId(null);
     setCurrentCardIndex(0); 
     if (weekData.materials.length > 0) {
       setActiveMaterial(weekData.materials[0]);
@@ -443,8 +493,6 @@ export default function StudentDashboard() {
                       key={mat.id}
                       onClick={() => {
                         setActiveMaterial(mat);
-                        setQuizResult(null);
-                        setSelectedAnswers({});
                       }}
                       className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-black transition-all ${
                         activeMaterial?.id === mat.id
@@ -455,7 +503,7 @@ export default function StudentDashboard() {
                       }`}
                     >
                       {completedMaterials.includes(mat.id) ? (
-                        <CheckCircle size={14} className="text-green-500" />
+                        <CheckCircle2 size={14} className="text-green-500" />
                       ) : (
                         mat.content_type === 'video' ? <Video size={14} /> : 
                         mat.content_type === 'podcast' ? <Headphones size={14} /> : 
@@ -498,65 +546,87 @@ export default function StudentDashboard() {
                     </div>
 
                     <div className="p-8 space-y-10">
-                      {quizResult ? (
+                      {/* --- TEST KİLİTLİ VEYA SONUÇ EKRANI --- */}
+                      {(completedMaterials.includes(activeMaterial.id) || quizResult) ? (
                         <div className="text-center py-12 space-y-6 animate-in zoom-in-95 duration-500">
-                          <div className="w-24 h-24 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto border-4 border-green-100 shadow-xl">
-                            <Award size={48} />
-                          </div>
-                          <div>
-                            <h3 className="text-3xl font-black text-secondary uppercase tracking-tighter">Tebrikler!</h3>
-                            <p className="text-gray-500 font-medium">Sınav sonucun başarıyla kaydedildi.</p>
-                          </div>
-                          <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
-                            <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100">
-                              <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Puan</p>
-                              <p className="text-2xl font-black text-secondary">%{quizResult.score}</p>
+                          {quizResult ? (
+                            <>
+                              <div className="w-24 h-24 bg-green-50 text-green-500 rounded-full flex items-center justify-center mx-auto border-4 border-green-100 shadow-xl">
+                                <Award size={48} />
+                              </div>
+                              <div>
+                                <h3 className="text-3xl font-black text-secondary uppercase tracking-tighter">Tebrikler!</h3>
+                                <p className="text-gray-500 font-medium">Sınav sonucun başarıyla kaydedildi.</p>
+                              </div>
+                              <div className="grid grid-cols-3 gap-4 max-w-md mx-auto">
+                                <div className="bg-gray-50 p-4 rounded-3xl border border-gray-100">
+                                  <p className="text-[10px] font-black text-gray-400 uppercase mb-1">Puan</p>
+                                  <p className="text-2xl font-black text-secondary">%{quizResult.score}</p>
+                                </div>
+                                <div className="bg-green-50 p-4 rounded-3xl border border-green-100">
+                                  <p className="text-[10px] font-black text-green-600 uppercase mb-1">Doğru</p>
+                                  <p className="text-2xl font-black text-green-600">{quizResult.correct}</p>
+                                </div>
+                                <div className="bg-red-50 p-4 rounded-3xl border border-red-100">
+                                  <p className="text-[10px] font-black text-red-600 uppercase mb-1">Yanlış</p>
+                                  <p className="text-2xl font-black text-red-600">{quizResult.wrong}</p>
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="space-y-4">
+                              <div className="w-20 h-20 bg-gray-100 text-gray-400 rounded-full flex items-center justify-center mx-auto">
+                                <Lock size={32} />
+                              </div>
+                              <h3 className="text-xl font-black text-secondary uppercase">Bu Test Tamamlandı</h3>
+                              <p className="text-gray-400 text-sm max-w-xs mx-auto">Sonuçlar getiriliyor...</p>
                             </div>
-                            <div className="bg-green-50 p-4 rounded-3xl border border-green-100">
-                              <p className="text-[10px] font-black text-green-600 uppercase mb-1">Doğru</p>
-                              <p className="text-2xl font-black text-green-600">{quizResult.correct}</p>
-                            </div>
-                            <div className="bg-red-50 p-4 rounded-3xl border border-red-100">
-                              <p className="text-[10px] font-black text-red-600 uppercase mb-1">Yanlış</p>
-                              <p className="text-2xl font-black text-red-600">{quizResult.wrong}</p>
-                            </div>
-                          </div>
+                          )}
+                          
+                          {/* AI ANALİZ BUTONU */}
+                          <button 
+                            onClick={handleFetchAIAnalysis}
+                            disabled={!currentAttemptId}
+                            className="mt-6 mx-auto flex items-center gap-3 bg-secondary text-white px-10 py-5 rounded-[2rem] font-black text-xs tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl border border-gray-700 uppercase disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Sparkles size={18} className="text-primary animate-pulse" /> Yapay Zeka Analizini Gör
+                          </button>
                         </div>
                       ) : (
-                        activeMaterial.quiz?.questions.map((q, qIdx) => (
-                          <div key={q.id} className="question-block space-y-5">
-                            <h3 className="text-lg font-bold text-secondary flex gap-4">
-                              <span className="text-primary font-black">0{qIdx + 1}.</span> {q.question_text}
-                            </h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-10">
-                              {q.options.map((opt) => (
-                                <button
-                                  key={opt.id}
-                                  disabled={completedMaterials.includes(activeMaterial.id)}
-                                  onClick={() => setSelectedAnswers(prev => ({...prev, [q.id]: opt.id}))}
-                                  className={`p-4 rounded-2xl text-left text-sm font-bold border-2 transition-all flex items-center justify-between group
-                                  ${selectedAnswers[q.id] === opt.id 
-                                    ? 'bg-primary border-primary text-white shadow-lg' 
-                                    : 'bg-white border-gray-100 text-gray-500 hover:border-red-200 hover:bg-red-50'}`}
-                                >
-                                  {opt.option_text}
-                                  {selectedAnswers[q.id] === opt.id && <ArrowRight size={16} className="animate-pulse"/>}
-                                </button>
-                              ))}
+                        // --- SORULAR ---
+                        <>
+                          {activeMaterial.quiz?.questions.map((q, qIdx) => (
+                            <div key={q.id} className="question-block space-y-5">
+                              <h3 className="text-lg font-bold text-secondary flex gap-4">
+                                <span className="text-primary font-black">0{qIdx + 1}.</span> {q.question_text}
+                              </h3>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-10">
+                                {q.options.map((opt) => (
+                                  <button
+                                    key={opt.id}
+                                    onClick={() => setSelectedAnswers(prev => ({...prev, [q.id]: opt.id}))}
+                                    className={`p-4 rounded-2xl text-left text-sm font-bold border-2 transition-all flex items-center justify-between group
+                                    ${selectedAnswers[q.id] === opt.id 
+                                      ? 'bg-primary border-primary text-white shadow-lg' 
+                                      : 'bg-white border-gray-100 text-gray-500 hover:border-red-200 hover:bg-red-50'}`}
+                                  >
+                                    {opt.option_text}
+                                    {selectedAnswers[q.id] === opt.id && <ArrowRight size={16} className="animate-pulse"/>}
+                                  </button>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        ))
-                      )}
-                      
-                      {!quizResult && !completedMaterials.includes(activeMaterial.id) && (
-                        <button 
-                          onClick={handleQuizSubmit} 
-                          disabled={quizSubmitting}
-                          className="w-full bg-secondary hover:bg-black text-white py-6 rounded-[2rem] font-black tracking-widest transition-all shadow-2xl flex items-center justify-center gap-3 active:scale-[0.98] disabled:bg-gray-300 uppercase"
-                        >
-                          <Send size={20} className="text-primary"/> 
-                          {quizSubmitting ? "KONTROL EDİLİYOR..." : "SINAVI BİTİR VE PUANLA"}
-                        </button>
+                          ))}
+                          
+                          <button 
+                            onClick={handleQuizSubmit} 
+                            disabled={quizSubmitting}
+                            className="w-full bg-secondary hover:bg-black text-white py-6 rounded-[2rem] font-black tracking-widest transition-all shadow-2xl flex items-center justify-center gap-3 active:scale-[0.98] disabled:bg-gray-300 uppercase mt-10"
+                          >
+                            <Send size={20} className="text-primary"/> 
+                            {quizSubmitting ? "KONTROL EDİLİYOR..." : "SINAVI BİTİR VE PUANLA"}
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>
@@ -628,6 +698,64 @@ export default function StudentDashboard() {
           </div>
         )}
       </main>
+
+      {/* --- AI ANALYSIS MODAL --- */}
+      {isAnalysisModalOpen && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-secondary/80 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white w-full max-w-2xl rounded-[3rem] shadow-[0_30px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden animate-in zoom-in-95 duration-300 border-4 border-white">
+            <div className="bg-secondary p-8 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="bg-primary p-3 rounded-2xl shadow-lg shadow-red-500/20">
+                  <Bot className="text-white" size={24} />
+                </div>
+                <div>
+                  <h3 className="text-white font-black uppercase tracking-tighter text-xl">Akıllı Performans Analizi</h3>
+                  <p className="text-primary text-[10px] font-bold uppercase tracking-widest">BÜ-LMS Yapay Zeka Servisi</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsAnalysisModalOpen(false)} 
+                className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-primary transition-all"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-10 min-h-[300px] max-h-[60vh] overflow-y-auto custom-scrollbar">
+              {isAnalysisLoading ? (
+                <div className="flex flex-col items-center justify-center py-20 gap-6">
+                  <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                  <div className="text-center">
+                    <p className="text-secondary font-black text-lg uppercase tracking-widest animate-pulse">Analiz Yapılıyor...</p>
+                    <p className="text-gray-400 text-xs mt-2">Yapay zeka asistanı cevaplarını inceliyor ve sana özel bir yol haritası çıkarıyor.</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="bg-red-50 border-l-8 border-primary p-8 rounded-3xl">
+                    <div className="flex items-center gap-2 mb-4 text-primary">
+                      <Sparkles size={18} />
+                      <span className="font-black text-xs uppercase tracking-widest">Kişiselleştirilmiş Eğitmen Notu</span>
+                    </div>
+                    <p className="text-secondary font-medium leading-loose text-base whitespace-pre-line italic">
+                      {aiAnalysisFeedback}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-8 bg-gray-50 border-t border-gray-100 flex justify-center">
+              <button 
+                onClick={() => setIsAnalysisModalOpen(false)}
+                className="bg-secondary hover:bg-black text-white px-12 py-4 rounded-2xl font-black text-xs tracking-widest transition-all shadow-xl uppercase"
+              >
+                Kapat ve Çalışmaya Devam Et
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* AI CHAT PANELİ */}
       <div className="fixed bottom-8 right-8 z-[999] flex flex-col items-end">
