@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Backend adresini merkezi olarak buradan yönetiyoruz
 const api = axios.create({
-  baseURL: 'https://loud-luce-ramazan1234said-06afe9f2.koyeb.app/api',
+  baseURL: 'https://api.yapayzekadesteklisinif.com.tr/api',
 });
 
 // Axios Interceptor: Her istek gönderilmeden hemen önce araya girer
