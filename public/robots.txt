@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+
+
+
+# Sitenin haritasını buraya ekleyeceğiz (aşağıda anlatıyorum)
+Sitemap: https://yapayzekadesteklisinif.com.tr/sitemap.xml
