@@ -138,7 +138,7 @@ export default function StudentDashboard() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // --- SAYAÇ SÜRELERİ ---
-  const introWatchThreshold = 420;    // 7 dk
+  const introWatchThreshold = 240;    // 7 dk
   const materialWatchThreshold = 420; // 7 dk
 
   const [watchTime, setWatchTime] = useState(0);
