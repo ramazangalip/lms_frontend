@@ -615,7 +615,7 @@ export default function StudentDashboard() {
                       {selectedWeek.flashcards && selectedWeek.flashcards.length > 0 && (
                         <div className="bg-gray-50 p-8 rounded-[3rem] border border-gray-100 space-y-8">
                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-4 shrink-0"><div className="bg-primary p-3 rounded-2xl text-white shadow-lg leading-none text-center"><BookOpen size={24}/></div><h3 className="font-black text-secondary uppercase text-lg tracking-tighter leading-none text-center">Flashcards</h3></div>
+                              <div className="flex items-center gap-4 shrink-0"><div className="bg-primary p-3 rounded-2xl text-white shadow-lg leading-none text-center"><BookOpen size={24}/></div><h3 className="font-black text-secondary uppercase text-lg tracking-tighter leading-none text-center">TEKRAR KARTLARI</h3></div>
                               <div className="flex items-center gap-3 bg-white p-1.5 rounded-full border shadow-sm shrink-0">
                                  <button onClick={() => setCurrentCardIndex(prev => Math.max(0, prev - 1))} className="p-2 hover:bg-gray-50 rounded-full transition-colors disabled:opacity-20" disabled={currentCardIndex === 0}><ChevronLeft size={20}/></button>
                                  <span className="text-[10px] font-black w-10 text-center leading-none">{currentCardIndex + 1}/{selectedWeek.flashcards.length}</span>
