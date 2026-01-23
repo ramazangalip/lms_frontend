@@ -130,7 +130,7 @@ export default function StudentDashboard() {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const [watchTime, setWatchTime] = useState(0);
-  const watchThreshold = 900; 
+  const watchThreshold = 420; 
 
   const trackingInterval = useRef<NodeJS.Timeout | null>(null);
   const watchTimerRef = useRef<NodeJS.Timeout | null>(null);
