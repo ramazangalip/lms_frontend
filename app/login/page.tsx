@@ -94,6 +94,9 @@ export default function LoginPage() {
           <p className="text-gray-600">
             Hesabınız yok mu? <Link href="/register" className="font-bold text-primary hover:underline">Kayıt Ol</Link>
           </p>
+          <p className="text-gray-600">
+            Şifrenizi mi Unuttunuz? <Link href="/forgot-password" className="font-bold text-primary hover:underline">Şifreyi Sıfırla</Link>
+          </p>
         </div>
       </div>
     </div>
