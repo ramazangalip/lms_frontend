@@ -86,7 +86,7 @@ export default function LoginPage() {
             disabled={loading} 
             className="w-full rounded-lg bg-primary py-3 font-bold text-white transition-all hover:opacity-90 disabled:bg-gray-400"
           >
-            {loading ? "İŞLENİYOR..." : "GİRİŞ YAP"}
+            {loading ? "GİRİŞ YAPILIYOR..." : "GİRİŞ YAP"}
           </button>
         </form>
 
