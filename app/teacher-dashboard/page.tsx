@@ -559,7 +559,7 @@ export default function TeacherDashboard() {
                   <div className="bg-blue-50 p-4 rounded-2xl text-blue-600 shrink-0 leading-none"><Users size={32} /></div>
                   <div className="text-left leading-none"><p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-2 leading-none">Kayıtlı Öğrenci</p><p className="text-3xl font-black leading-none">{analytics.length}</p></div>
                </div>
-               <button onClick={handlePrintAll} className="w-full md:w-auto flex items-center justify-center gap-3 bg-red-700 hover:bg-green-700 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all leading-none active:scale-95"><FileText size={18} /> TOPLU AKADEMİK ÇİZELGE (PDF) AL</button>
+               <button onClick={handlePrintAll} className="w-full md:w-auto flex items-center justify-center gap-3 bg-red-700 hover:bg-red-800 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all leading-none active:scale-95"><FileText size={18} /> TOPLU AKADEMİK ÇİZELGE (PDF) AL</button>
             </div>
 
             <div className="bg-white rounded-3xl md:rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden text-left leading-normal text-left text-left">
