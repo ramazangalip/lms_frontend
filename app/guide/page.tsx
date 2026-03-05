@@ -5,7 +5,7 @@ import { Video, ArrowLeft, Info, HelpCircle } from 'lucide-react';
 
 export default function GuidePage() {
   // OneDrive Video Embed Linkin (Buraya kendi iframe src linkini koymalısın)
-  const videoIframeUrl = "https://bingol-my.sharepoint.com/personal/241161012_bingol_edu_tr/_layouts/15/embed.aspx?UniqueId=13a6a5a0-ff4a-47f4-9c2a-951d2b944dc7&embed=%7B%22ust%22%3Atrue%2C%22hv%22%3A%22CopyEmbedCode%22%7D&referrer=StreamWebApp&referrerScenario=EmbedDialog.Create";
+  const videoIframeUrl = "https://www.youtube.com/embed/ulFHl4c0QpE?si=xVAtBKXNl6fNxfmH";
 
   return (
     <div className="min-h-screen bg-gray-50 font-roboto flex flex-col items-center py-10 px-6">

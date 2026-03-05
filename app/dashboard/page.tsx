@@ -302,38 +302,51 @@ const getIntroData = () => {
   const introStatus = getIntroData();
 
  useEffect(() => {
-  if (introTimerRef.current) clearInterval(introTimerRef.current);
-  
-  // Eğer tanıtım ekranındaysak ve henüz tamamlanmamışsa (isWatched false ise)
-  if (isIntroView && !introStatus.isWatched) {
+    // Mevcut bir sayaç varsa her ihtimale karşı temizle
+    if (introTimerRef.current) clearInterval(introTimerRef.current);
     
-    // DURUM A: VİDEO YOKSA (Sadece Metin Varsa)
-    if (!introStatus.url) {
-      console.log("Video bulunamadı, metin bazlı kilit açma tetiklendi.");
-      const timer = setTimeout(() => {
-        api.post('/contents/weeks/complete-intro/')
-           .then(() => fetchContents(true))
-           .catch(err => console.error("Metin onayı hatası:", err));
-      }, 2000); // 2 saniye sonra otomatik açar
-      return () => clearTimeout(timer);
+    // Eğer öğrenci Tanıtım ekranındaysa ve henüz kilitler açılmamışsa (isWatched false ise)
+    if (isIntroView && !introStatus.isWatched) {
+      console.log("Tanıtım izleme sayacı başlatıldı. Hedef süre:", introWatchThreshold, "saniye.");
+      
+      // İç referansı ve görsel sayacı her girişte sıfırla
+      introWatchTimeInternalRef.current = 0;
+      setIntroWatchTime(0);
+
+      introTimerRef.current = setInterval(() => {
+        introWatchTimeInternalRef.current += 1; 
+        setIntroWatchTime(introWatchTimeInternalRef.current);
+        
+        // Hata ayıklama için her saniye konsola yazdırabilirsin
+        // console.log("Tanıtım Saniyesi:", introWatchTimeInternalRef.current);
+
+        // Hedef süreye ulaşıldığında kilit açma isteği gönder
+        if (introWatchTimeInternalRef.current >= introWatchThreshold) {
+          console.log("Tanıtım süresi doldu, kilitler açılıyor...");
+          
+          // Sayacı durdur
+          if (introTimerRef.current) clearInterval(introTimerRef.current);
+          
+          // API isteği gönder
+          api.post('/contents/weeks/complete-intro/')
+             .then(() => {
+                // Başarılı olduğunda içerikleri tazele (Kilit ikonlarının gitmesi için)
+                fetchContents(true); 
+             })
+             .catch(err => {
+                console.error("Tanıtım tamamlama isteği gönderilemedi:", err);
+             });
+        }
+      }, 1000);
     }
 
-    // DURUM B: VİDEO VARSA (Eski sayaç mantığı)
-    introWatchTimeInternalRef.current = 0;
-    introTimerRef.current = setInterval(() => {
-      introWatchTimeInternalRef.current += 1; 
-      setIntroWatchTime(introWatchTimeInternalRef.current);
-      
-      if (introWatchTimeInternalRef.current >= introWatchThreshold) {
-        api.post('/contents/weeks/complete-intro/')
-           .then(() => fetchContents(true));
-      }
-    }, 1000);
-  }
-
-  return () => { if (introTimerRef.current) clearInterval(introTimerRef.current); };
-  // Bağımlılıklara introStatus.url eklemeyi unutma
-}, [isIntroView, introStatus.url, introStatus.isWatched]);
+    // Bileşen kapandığında veya sayfa değiştiğinde sayacı mutlaka temizle (Memory leak önleyici)
+    return () => { 
+      if (introTimerRef.current) clearInterval(introTimerRef.current); 
+    };
+    
+    // Bağımlılıklardan introStatus.url kaldırıldı; artık video olsa da olmasa da çalışır.
+  }, [isIntroView, introStatus.isWatched]);
 
   useEffect(() => {
     if (watchTimerRef.current) clearInterval(watchTimerRef.current);
