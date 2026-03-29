@@ -106,6 +106,7 @@ interface BulkStudentData {
   email: string;
   department: string;
   total_points: number;
+  pre_test_score?: string; // <-- BU SATIRI EKLE (Opsiyonel string olarak)
   total_time: number;
   weekly_breakdown: {
     week: number;
