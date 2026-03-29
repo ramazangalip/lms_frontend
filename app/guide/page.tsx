@@ -10,7 +10,7 @@ export default function GuidePage() {
   // URL Tanımlamaları
   const guideVideoUrl = "https://www.youtube.com/embed/ulFHl4c0QpE"; // 1. Video
   const extraVideoUrl = "https://www.youtube.com/embed/ulFHl4c0QpE"; // 2. Video (Burayı değiştirirsin)
-  const apkDownloadUrl = "https://drive.google.com/uc?export=download&id=BURAYA_DRIVE_ID_GELECEK"; // APK Linki
+  const apkDownloadUrl = "https://drive.google.com/uc?export=download&id=12XsXnDRLBm2zyAQh-blITQGYGaBuO4z_"; // APK Linki güncellendi
 
   return (
     <div className="min-h-screen bg-gray-50 font-roboto flex flex-col items-center py-10 px-6 text-left">
@@ -51,19 +51,19 @@ export default function GuidePage() {
             onClick={() => setActiveTab('guide')}
             className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl text-[10px] font-black tracking-widest transition-all ${activeTab === 'guide' ? 'bg-white shadow-md text-[#ce1212]' : 'text-gray-400 hover:bg-gray-200'}`}
           >
-            <Monitor size={16} /> SİSTEM REHBERİ
+            <Monitor size={16} /> SİTE KULLANIM REHBERİ
           </button>
           <button 
             onClick={() => setActiveTab('extra')}
             className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl text-[10px] font-black tracking-widest transition-all ${activeTab === 'extra' ? 'bg-white shadow-md text-[#ce1212]' : 'text-gray-400 hover:bg-gray-200'}`}
           >
-            <PlayCircle size={16} /> EK EĞİTİM
+            <PlayCircle size={16} /> MOBİL UYGULAMA İNDİRME REHBERİ
           </button>
           <button 
             onClick={() => setActiveTab('mobile')}
             className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl text-[10px] font-black tracking-widest transition-all ${activeTab === 'mobile' ? 'bg-white shadow-md text-[#ce1212]' : 'text-gray-400 hover:bg-gray-200'}`}
           >
-            <Smartphone size={16} /> MOBİL (APK)
+            <Smartphone size={16} /> MOBİL UYGULAMA DOSYASI
           </button>
         </div>
 
@@ -86,7 +86,7 @@ export default function GuidePage() {
               <div className="relative aspect-video rounded-[1.5rem] overflow-hidden shadow-2xl border-2 border-white bg-black">
                 <iframe src={extraVideoUrl} className="absolute inset-0 w-full h-full" allowFullScreen title="Rehber 2"></iframe>
               </div>
-              <p className="text-center text-xs font-bold text-gray-500 uppercase tracking-widest">Yapay Zeka modülleri ve detaylı kullanım eğitimi.</p>
+              <p className="text-center text-xs font-bold text-gray-500 uppercase tracking-widest">Mobil Uygulama İndirme Hakkında Bilgi Almak İçin Bu videoyu alabilirsiniz.</p>
             </div>
           )}
 
@@ -106,7 +106,7 @@ export default function GuidePage() {
                   rel="noopener noreferrer"
                   className="w-full flex items-center justify-center gap-3 bg-secondary text-white py-5 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-black transition-all active:scale-95 shadow-lg"
                 >
-                  <Download size={18} /> APK DOSYASINI İNDİR
+                  <Download size={18} /> UYGULAMA DOSYASINI İNDİR
                 </a>
               </div>
               <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">* Google Drive üzerinden güvenli indirme bağlantısıdır.</p>
