@@ -98,7 +98,7 @@ export default function LoginPage() {
             Şifrenizi mi Unuttunuz? <Link href="/forgot-password" className="font-bold text-primary hover:underline">Şifreyi Sıfırla</Link>
           </p>
           <p className="text-gray-600">
-            Kayıt Olmakta Sorun Mu Yaşıyorsunuz? <Link href="/guide" className="font-bold text-primary hover:underline">Rehber Videosunu İncelemek İçin Tıklayın</Link>
+            Yardım mı Almak İstiyorsunuz? <Link href="/guide" className="font-bold text-primary hover:underline">Site ve Mobil Uygulama Hakkında Yardım Almak için tıklayınız</Link>
           </p>
         </div>
       </div>

@@ -39,6 +39,11 @@ interface WeeklyContent {
   is_completed?: boolean;
   // YENİ EKLENEN ALAN:
   current_attempt_round: number; 
+  pre_test_questions?: Question[]; // Bunu ekle
+  pre_test_data?: {                // Bunu ekle
+    is_completed: boolean;
+    score: number;
+  };
 }
 interface ProgressData { weekly_content: number | string; completion_percentage: number; is_completed: boolean; }
 
@@ -78,6 +83,16 @@ export default function StudentDashboard() {
   const watchTimerRef = useRef<NodeJS.Timeout | null>(null);
   const introTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isInitialMount = useRef(true);
+  // State tanımlamalarının olduğu bölüme ekle
+  const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([]);
+  const [preTestAnswers, setPreTestAnswers] = useState<Record<number, number>>({});
+  const [preTestResult, setPreTestResult] = useState<{
+  score: number, 
+  correct?: number, 
+  wrong?: number, 
+  is_completed: boolean
+} | null>(null);
+  const [preTestSubmitting, setPreTestSubmitting] = useState(false);
 
   useEffect(() => { activeMaterialRef.current = activeMaterial; }, [activeMaterial]);
 
@@ -109,46 +124,65 @@ const getIntroData = () => {
   };
 };
 
- const fetchContents = async (isUpdate = false) => {
-    try {
-      const [contentRes, progressRes, completedMatsRes, analyticsRes] = await Promise.all([
-        api.get('/contents/list/'), 
-        api.get('/contents/studentprogress/'),
-        api.get('/contents/completed-materials-ids/'), 
-        api.get('/contents/analytics/')
-      ]);
-      
-      setUserTotalPoints(analyticsRes.data.total_points || 0);
-      const stringifiedCompleted = (completedMatsRes.data || []).map((id: any) => String(id));
-      setCompletedMaterials(stringifiedCompleted);
-      
-      const rawContents = contentRes.data;
-      const mergedData = rawContents.map((week: WeeklyContent) => {
-        const foundProgress = progressRes.data.find((p: ProgressData) => String(p.weekly_content) === String(week.id));
-        return { 
-          ...week, 
-          progress: foundProgress ? Math.round(foundProgress.completion_percentage) : 0, 
-          is_completed: foundProgress ? foundProgress.is_completed : false 
-        };
-      });
-      setContents(mergedData);
+const fetchContents = async (isUpdate = false) => {
+  try {
+    const [contentRes, progressRes, completedMatsRes, analyticsRes, preTestRes] = await Promise.all([
+      api.get('/contents/list/'), 
+      api.get('/contents/studentprogress/'),
+      api.get('/contents/completed-materials-ids/'), 
+      api.get('/contents/analytics/'),
+      api.get('/contents/pre-test/status/')
+    ]);
 
-      // --- ANLIK GÜNCELLEME SİHRİ BURADA ---
-      // Eğer bir hafta seçiliyse, o haftanın güncel verilerini (progress, round vb.) 
-      // yeni gelen mergedData içinden bulup selectedWeek state'ini tazeliyoruz.
-      if (selectedWeek) {
-        const freshWeekData = mergedData.find((w: WeeklyContent) => w.id === selectedWeek.id);
-        if (freshWeekData) {
-          setSelectedWeek(freshWeekData);
-        }
+    // --- ÖN TEST VERİLERİNİ SETLİYORUZ (KRİTİK GÜNCELLEME) ---
+    if (preTestRes.data) {
+      setPreTestQuestions(preTestRes.data.questions || []);
+      
+      if (preTestRes.data.result) {
+        // Objeyi parçalayarak (destructuring) state'e tam olarak ne gittiğini netleştiriyoruz
+        const { is_completed, score, correct, wrong } = preTestRes.data.result;
+        setPreTestResult({
+          is_completed: is_completed,
+          score: score,
+          correct: correct, // Backend'den gelen 'correct' alanı
+          wrong: wrong      // Backend'den gelen 'wrong' alanı
+        });
       }
-      // -------------------------------------
+    }
+    
+    // 2. Kullanıcı puanlarını güncelle
+    setUserTotalPoints(analyticsRes.data.total_points || 0);
+    
+    // 3. Tamamlanan materyal ID'lerini string listesi yap
+    const stringifiedCompleted = (completedMatsRes.data || []).map((id: any) => String(id));
+    setCompletedMaterials(stringifiedCompleted);
+    
+    // 4. Haftalık içerikleri ve ilerleme yüzdelerini birleştir
+    const rawContents = contentRes.data;
+    const mergedData = rawContents.map((week: WeeklyContent) => {
+      const foundProgress = progressRes.data.find((p: ProgressData) => String(p.weekly_content) === String(week.id));
+      return { 
+        ...week, 
+        progress: foundProgress ? Math.round(foundProgress.completion_percentage) : 0, 
+        is_completed: foundProgress ? foundProgress.is_completed : false 
+      };
+    });
+    setContents(mergedData);
 
-      // Sayfa ilk açıldığında veya hafta değiştiğinde testi kontrol et
-      const currentWeek = selectedWeek || mergedData.sort((a: any, b: any) => a.week_number - b.week_number)[0];
-      if (currentWeek) {
-        const quizMat = currentWeek.materials.find((m: any) => m.content_type === 'form');
-        if (quizMat && stringifiedCompleted.includes(String(quizMat.id))) {
+    // 5. Mevcut seçili hafta varsa, verilerini tazele
+    if (selectedWeek) {
+      const freshWeekData = mergedData.find((w: WeeklyContent) => w.id === selectedWeek.id);
+      if (freshWeekData) {
+        setSelectedWeek(freshWeekData);
+      }
+    }
+
+    // 6. Haftalık Sınav (Quiz) Durum Kontrolü
+    const currentWeek = selectedWeek || mergedData.sort((a: any, b: any) => a.week_number - b.week_number)[0];
+    if (currentWeek) {
+      const quizMat = currentWeek.materials.find((m: any) => m.content_type === 'form');
+      if (quizMat && stringifiedCompleted.includes(String(quizMat.id))) {
+         try {
            const res = await api.get(`/contents/quiz/${quizMat.quiz.id}/last-attempt/`);
            if (res.data) {
              setQuizResult({
@@ -158,21 +192,25 @@ const getIntroData = () => {
              });
              setCurrentAttemptId(String(res.data.id));
            }
-        }
+         } catch (qErr) {
+           console.log("Haftalık sınav verisi çekilemedi.");
+         }
       }
-
-      if (isInitialMount.current && mergedData.length > 0 && !selectedWeek) {
-        setSelectedWeek(mergedData.sort((a: any, b: any) => a.week_number - b.week_number)[0]);
-        setIsIntroView(true); 
-        isInitialMount.current = false;
-      }
-    } catch (err) { 
-      console.error("Veri çekme hatası."); 
-    } finally { 
-      setLoading(false); 
     }
-  };
 
+    // 7. İlk açılış kontrolü
+    if (isInitialMount.current && mergedData.length > 0 && !selectedWeek) {
+      setSelectedWeek(mergedData.sort((a: any, b: any) => a.week_number - b.week_number)[0]);
+      setIsIntroView(true); 
+      isInitialMount.current = false;
+    }
+
+  } catch (err) { 
+    console.error("Öğrenci verileri yüklenirken hata oluştu:", err); 
+  } finally { 
+    setLoading(false); 
+  }
+};
   useEffect(() => { fetchContents(); }, []);
 
   const handleCompleteMaterial = async (materialId: number | string) => {
@@ -225,6 +263,40 @@ const getIntroData = () => {
     localStorage.clear();
     window.location.href = '/login';
   };
+
+  // Bu fonksiyonu "Test Gönderimi" bölümüne ekle
+const handlePreTestSubmit = async () => {
+  if (Object.keys(preTestAnswers).length < preTestQuestions.length) {
+    alert("Lütfen tüm ön değerlendirme sorularını cevaplayın.");
+    return;
+  }
+  setPreTestSubmitting(true);
+  try {
+    const answers = Object.entries(preTestAnswers).map(([qId, oId]) => ({
+      question_id: Number(qId),
+      option_id: Number(oId)
+    }));
+    
+    // Backend: path('pre-test/submit/', ...)
+    const res = await api.post('/contents/pre-test/submit/', { answers });
+    
+    // Backend'den gelen TAM sonucu state'e yaz (Skor, Doğru, Yanlış)
+    setPreTestResult({ 
+      score: res.data.score, 
+      correct: res.data.correct, 
+      wrong: res.data.wrong, 
+      is_completed: true 
+    });
+    
+    // Sidebar kilitlerinin kalkması için genel listeyi tekrar çek
+    await fetchContents(true);
+    alert("Ön değerlendirme başarıyla tamamlandı!");
+  } catch (err) {
+    alert("Ön test gönderilirken bir hata oluştu.");
+  } finally {
+    setPreTestSubmitting(false);
+  }
+};
 
   // --- TEST GÖNDERİMİ ---
   const handleQuizSubmit = async () => {
@@ -437,8 +509,11 @@ const getIntroData = () => {
             const isActive = selectedWeek?.week_number === num && !isIntroView;
             const isFinished = weekData?.is_completed;
             const introLocked = !introStatus.isWatched;
-            const isWeekLocked = weekData?.is_locked || introLocked;
-            const lockReason = weekData?.lock_reason || (introLocked ? "Önce tanıtım videosunu izlemelisiniz." : "");
+            const preTestLocked = !preTestResult?.is_completed;
+            const isWeekLocked = num >= 1 && (introLocked || preTestLocked);
+            const lockReason = introLocked 
+  ? "Önce tanıtım videosunu izlemelisiniz." 
+  : (preTestLocked ? "Önce ön değerlendirme testini bitirmelisiniz." : "");
 
             return (
               <div key={`sidebar-week-wrapper-${num}`} className="relative group">
@@ -484,41 +559,152 @@ const getIntroData = () => {
        {/* --- HAFTA İÇERİĞİ ANA ALANI --- */}
 {selectedWeek ? (
   <div className="animate-in fade-in duration-500">
-    {isIntroView ? (
-      /* --- TANITIM GÖRÜNÜMÜ (Değişmedi) --- */
-      <div className="max-w-3xl mx-auto p-6 md:p-14 space-y-10 text-center leading-none">
-        <div className="text-center space-y-4">
-          <div className="bg-primary/10 text-primary w-14 h-14 rounded-2xl flex items-center justify-center mx-auto border border-primary/20 animate-pulse">
-            <Zap size={28} />
+  {(isIntroView || !introStatus.isWatched || !preTestResult?.is_completed) ? (
+  /* --- TANITIM VE ÖN DEĞERLENDİRME GÖRÜNÜMÜ (ZORUNLU KİLİT) --- */
+  <div className="max-w-4xl mx-auto p-6 md:p-14 space-y-12 animate-in fade-in duration-700">
+    
+    {/* 1. BÖLÜM: ÜST BİLGİ VE VİDEO */}
+    <div className="space-y-10 text-center leading-none">
+      <div className="text-center space-y-4">
+        <div className="bg-primary/10 text-primary w-14 h-14 rounded-2xl flex items-center justify-center mx-auto border border-primary/20 animate-pulse">
+          <Zap size={28} />
+        </div>
+        <h2 className="text-2xl md:text-4xl font-black text-secondary uppercase tracking-tighter leading-none">
+          {introStatus.title}
+        </h2>
+        <div className="bg-gray-50 px-4 py-2.5 rounded-xl border flex items-center gap-3 mx-auto w-fit shadow-sm">
+          <ShieldCheck size={16} className={introStatus.isWatched ? "text-green-500" : "text-primary"} />
+          <span className="text-[10px] font-black uppercase tracking-widest text-secondary">
+            {introStatus.isWatched 
+              ? "TANITIM VİDEOSU İZLENDİ" 
+              : "SİSTEME GİRİŞ İÇİN ÖNCE VİDEOYU İZLEMELİSİNİZ"}
+          </span>
+        </div>
+      </div>
+
+      {introStatus.url && (
+        <div className="relative aspect-video rounded-[2.5rem] overflow-hidden shadow-2xl border-4 border-gray-50 ring-1 ring-gray-200 bg-secondary">
+          <iframe src={introStatus.url} className="w-full h-full" allowFullScreen></iframe>
+        </div>
+      )}
+
+      {introStatus.description && (
+        <div className="bg-white p-8 md:p-12 rounded-[2.5rem] border-2 border-gray-50 shadow-xl text-left leading-relaxed">
+          <p className="text-gray-600 text-sm md:text-base font-medium whitespace-pre-line italic">
+            {introStatus.description}
+          </p>
+        </div>
+      )}
+    </div>
+
+    {/* 2. BÖLÜM: ÖN DEĞERLENDİRME TESTİ (GATEKEEPER) */}
+    <div className="pt-10 space-y-8">
+      <div className="flex items-center gap-4 justify-center">
+        <div className="h-px bg-gray-200 flex-1"></div>
+        <div className="bg-purple-50 text-purple-600 px-6 py-2.5 rounded-full border border-purple-100 flex items-center gap-2 shadow-sm">
+          <ListChecks size={18} />
+          <span className="text-[10px] font-black uppercase tracking-[0.2em]">Sistem Giriş Seviye Belirleme</span>
+        </div>
+        <div className="h-px bg-gray-200 flex-1"></div>
+      </div>
+
+      {/* --- TEST DURUMU KONTROLÜ --- */}
+      {preTestResult?.is_completed ? (
+        /* --- TEST BİTTİYSE: DETAYLI SONUÇ KARTI --- */
+        <div className="bg-gradient-to-br from-green-50 to-white p-10 rounded-[3rem] border-2 border-green-100 shadow-xl text-center space-y-8 animate-in zoom-in-95">
+          <div className="w-20 h-20 bg-green-500 text-white rounded-full flex items-center justify-center mx-auto shadow-lg shadow-green-200">
+            <CheckCircle2 size={40} />
           </div>
-          <h2 className="text-2xl md:text-4xl font-black text-secondary uppercase tracking-tighter leading-none">
-            {introStatus.title}
-          </h2>
-          <div className="bg-gray-50 px-4 py-2.5 rounded-xl border flex items-center gap-3 mx-auto w-fit shadow-sm">
-            <ShieldCheck size={16} className={introStatus.isWatched ? "text-green-500" : "text-primary"} />
-            <span className="text-[10px] font-black uppercase tracking-widest text-secondary">
-              {introStatus.isWatched 
-                ? "TANITIM TAMAMLANDI, HAFTALAR ERİŞİME AÇILDI." 
-                : introStatus.url 
-                  ? "HAFTALARIN AÇILMASI İÇİN VİDEOYU İZLEMELİSİNİZ." 
-                  : "SİSTEME ERİŞİM İÇİN BU BÖLÜMÜ İNCELEMENİZ YETERLİDİR."}
-            </span>
+          
+          <div className="space-y-2">
+            <h3 className="text-2xl font-black text-secondary uppercase tracking-tighter leading-none">ÖN DEĞERLENDİRME TAMAMLANDI</h3>
+            <p className="text-xs text-gray-500 font-bold uppercase tracking-widest leading-none">Akademik profiliniz oluşturuldu</p>
+          </div>
+
+          {/* DOĞRU - YANLIŞ - SKOR ÖZETİ */}
+          <div className="grid grid-cols-3 gap-3 max-w-sm mx-auto">
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+              <p className="text-[8px] font-black text-gray-400 uppercase mb-2">DOĞRU</p>
+              <p className="text-lg font-black text-green-600">{preTestResult.correct ?? '0'}</p>
+            </div>
+            <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+              <p className="text-[8px] font-black text-gray-400 uppercase mb-2">YANLIŞ</p>
+              <p className="text-lg font-black text-red-600">{preTestResult.wrong ?? '0'}</p>
+            </div>
+            <div className="bg-secondary p-4 rounded-2xl shadow-md">
+              <p className="text-[8px] font-black text-white/50 uppercase mb-2">SKOR</p>
+              <p className="text-lg font-black text-white">%{preTestResult.score}</p>
+            </div>
+          </div>
+
+          <div className="pt-4">
+            <div className="bg-secondary text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] animate-pulse inline-flex items-center gap-3">
+              <Sparkles size={16} className="text-primary" />
+              EĞİTİM İÇERİKLERİ ERİŞİME AÇILDI!
+            </div>
+            <p className="text-[9px] text-gray-400 font-bold mt-4 uppercase italic">Sol menüden 1. Hafta içeriklerine başlayabilirsiniz.</p>
           </div>
         </div>
-        {introStatus.url && (
-          <div className="relative aspect-video rounded-3xl overflow-hidden shadow-2xl border-4 border-gray-50 ring-1 ring-gray-200 bg-secondary">
-            <iframe src={introStatus.url} className="w-full h-full text-center" allowFullScreen></iframe>
-          </div>
-        )}
-        {introStatus.description && (
-          <div className="bg-white p-8 md:p-12 rounded-[2.5rem] border-2 border-gray-50 shadow-xl text-left leading-relaxed">
-            <p className="text-gray-600 text-sm md:text-base font-medium whitespace-pre-line italic">
-              {introStatus.description}
-            </p>
-          </div>
-        )}
-      </div>
-    ) : (
+      ) : (
+        /* --- TEST BİTMEDİYSE: SORULARI GÖSTER --- */
+        <div className="bg-white p-8 md:p-14 rounded-[3rem] shadow-2xl border-2 border-gray-50 space-y-12">
+          {preTestQuestions && preTestQuestions.length > 0 ? (
+            <>
+              <div className="space-y-10">
+                {preTestQuestions.map((q, qIdx) => (
+                  <div key={q.id} className="space-y-6 text-left border-b border-gray-50 pb-8 last:border-0 last:pb-0">
+                    <div className="flex gap-4 items-start">
+                      <span className="bg-purple-600 text-white w-8 h-8 rounded-xl flex items-center justify-center font-black shrink-0 shadow-lg shadow-purple-200 text-sm">
+                        {qIdx + 1}
+                      </span>
+                      <h3 className="text-base md:text-lg font-black text-secondary leading-tight pt-1">
+                        {q.question_text}
+                      </h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-12">
+                      {q.options.map((opt) => (
+                        <button
+                          key={opt.id}
+                          onClick={() => setPreTestAnswers(prev => ({...prev, [q.id]: opt.id}))}
+                          className={`p-4 rounded-2xl text-left text-xs font-bold border-2 transition-all flex items-center justify-between group ${
+                            preTestAnswers[q.id] === opt.id 
+                              ? 'bg-purple-600 border-purple-600 text-white shadow-xl scale-[1.02]' 
+                              : 'bg-white border-gray-100 text-gray-500 hover:border-purple-200 hover:bg-purple-50/30'
+                          }`}
+                        >
+                          <span className="flex-1 pr-2">{opt.option_text}</span>
+                          {preTestAnswers[q.id] === opt.id && <CheckCircle2 size={16} className="shrink-0 text-white" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <button 
+                onClick={handlePreTestSubmit}
+                disabled={preTestSubmitting || Object.keys(preTestAnswers).length < preTestQuestions.length}
+                className="w-full bg-secondary text-white py-6 rounded-3xl font-black tracking-[0.2em] shadow-2xl hover:bg-black transition-all active:scale-[0.98] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed text-xs md:text-sm uppercase flex items-center justify-center gap-3"
+              >
+                {preTestSubmitting ? (
+                  <RefreshCcw size={20} className="animate-spin" />
+                ) : (
+                  <>ÖN TESTİ GÖNDER VE EĞİTİMİ BAŞLAT <ArrowRight size={20} /></>
+                )}
+              </button>
+            </>
+          ) : (
+            <div className="text-center py-10 space-y-4">
+               <div className="w-12 h-12 border-4 border-purple-100 border-t-purple-500 rounded-full animate-spin mx-auto"></div>
+               <p className="opacity-30 italic font-bold text-secondary uppercase tracking-widest text-[10px]">
+                  Ön değerlendirme soruları hazırlanıyor...
+               </p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+) : (
       /* --- HAFTA İÇERİĞİ GÖRÜNÜMÜ (YENİ GRID YAPI) --- */
       <div className="max-w-screen-2xl mx-auto p-4 md:p-10">
         

@@ -142,6 +142,12 @@ interface StudentAnalytics {
   total_time_spent: string;
   overall_progress: number;
   weekly_breakdown: WeeklyProgress[];
+  pre_test_data?: {
+    score: number;
+    correct: number;
+    wrong: number;
+    date: string;
+  };
 }
 
 export default function TeacherDashboard() {
@@ -152,7 +158,7 @@ export default function TeacherDashboard() {
   const [analytics, setAnalytics] = useState<StudentAnalytics[]>([]);
   const [bulkData, setBulkData] = useState<BulkStudentData[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<StudentAnalytics | null>(null);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('cocukgelisimi');
 
   const [weekNumber, setWeekNumber] = useState(1);
   const [title, setTitle] = useState('');
@@ -174,6 +180,23 @@ export default function TeacherDashboard() {
     { id: 'eczanehizmetleri', name: 'Eczane Hizmetleri' },
     { id: 'fizyoterapi', name: 'Fizyoterapi' },
   ];
+
+  // TeacherDashboard fonksiyonunun en üstüne ekle
+const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
+  {
+    question_text: "",
+    options: [
+      { option_text: "", is_correct: true },
+      { option_text: "", is_correct: false },
+      { option_text: "", is_correct: false },
+      { option_text: "", is_correct: false },
+      { option_text: "", is_correct: false }
+    ]
+  }
+]);
+
+// fetchWeekDetail fonksiyonunda data.pre_test_questions'ı setlemeyi unutma:
+// setPreTestQuestions(data.pre_test_questions || [...]);
 
   const getDeptName = (id: string) => {
     const dept = departmentList.find(d => d.id === id);
@@ -258,36 +281,56 @@ export default function TeacherDashboard() {
     }
   }, [weekNumber, activeTab, fetchWeekDetail]);
 
+// --- ANALİZ VERİLERİNİ ÇEKME ---
+  // selectedDepartment değiştikçe bu fonksiyon kendini günceller
   // --- ANALİZ VERİLERİNİ ÇEKME ---
   const fetchAnalytics = useCallback(async () => {
+    // Güvenlik: Departman seçili değilse veya 'all' ise (tedbir amaçlı) istek atma
+    if (!selectedDepartment || selectedDepartment === 'all') return;
+
+    setLoading(true);
+    // KRİTİK: Yeni veri gelene kadar eski verileri temizle ki liste anlık sıfırlansın
+    setAnalytics([]); 
+    setBulkData([]);
+
     try {
+      // Sadece seçili departman parametresiyle istek atıyoruz
       const [res, bulkRes] = await Promise.all([
-        api.get('/contents/analytics/'),
-        api.get('/contents/bulk-academic-report/')
+        api.get(`/contents/analytics/?department=${selectedDepartment}`),
+        api.get(`/contents/bulk-academic-report/?department=${selectedDepartment}`)
       ]);
+      
       setAnalytics(res.data);
       setBulkData(bulkRes.data);
     } catch (err) {
-      console.error("Analiz verileri yüklenemedi");
+      console.error("Analiz verileri yüklenemedi:", err);
+      // Hata durumunda listelerin boş kaldığından emin ol
+      setAnalytics([]); 
+      setBulkData([]);
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }, [selectedDepartment]); // selectedDepartment değiştikçe fonksiyon kendini günceller
 
+  // Sekme (Tab) değiştiğinde veriyi tetikle
+ // --- KRİTİK: BÖLÜM DEĞİŞTİĞİNDE VERİYİ ANLIK ÇEK ---
   useEffect(() => {
-    if (activeTab === 'analytics') {
+    // Eğer analiz sekmesindeysek VE bir bölüm seçiliyse veriyi çek
+    if (activeTab === 'analytics' && selectedDepartment) {
+      console.log(`${selectedDepartment} için veriler güncelleniyor...`);
       fetchAnalytics();
     }
-  }, [activeTab, fetchAnalytics]);
+  }, [activeTab, selectedDepartment, fetchAnalytics]); // <-- selectedDepartment buraya eklendi!
 
   // --- FİLTRELEME HESAPLAMALARI ---
+  // Backend zaten filtreli gönderdiği için ekstra işlem yapmadan veriyi doğrudan döndürüyoruz.
   const filteredAnalytics = useMemo(() => {
-    if (selectedDepartment === 'all') return analytics;
-    return analytics.filter(s => s.department === selectedDepartment);
-  }, [analytics, selectedDepartment]);
+    return analytics;
+  }, [analytics]);
 
   const filteredBulkData = useMemo(() => {
-    if (selectedDepartment === 'all') return bulkData;
-    return bulkData.filter(s => s.department === selectedDepartment);
-  }, [bulkData, selectedDepartment]);
+    return bulkData;
+  }, [bulkData]);
 
   // --- MATERYAL ETKİLEŞİMLERİ ---
   const addMaterialRow = () => {
@@ -396,7 +439,9 @@ export default function TeacherDashboard() {
         intro_video_url: introVideoUrl,
         intro_description: introDescription,
         materials,
-        flashcards: flashcards.map((f, index) => ({ ...f, order: index }))
+        flashcards: flashcards.map((f, index) => ({ ...f, order: index })),
+        pre_test_questions: weekNumber === 1 ? preTestQuestions : [], // Sadece 1. haftada gönder
+
       };
       await api.post('/contents/list/', payload);
       alert("Haftalık içerik başarıyla güncellendi.");
@@ -440,6 +485,9 @@ export default function TeacherDashboard() {
             <thead>
               <tr className="bg-black text-white text-center">
                 <th className="border-2 border-black p-3 text-[10px] font-black uppercase leading-none text-left w-48">Öğrenci Adı Soyadı</th>
+                <th className="border-2 border-black p-3 text-[10px] font-black uppercase leading-none text-center bg-gray-200">
+  ÖN TEST
+</th>
                 {Array.from({ length: 14 }, (_, i) => i + 1).map(n => (
                   <th key={n} className="border-2 border-black p-1 text-[7px] font-black uppercase leading-none text-center w-32">
                     H.{n} ANALİZİ
@@ -453,7 +501,9 @@ export default function TeacherDashboard() {
               {filteredBulkData.map((student, idx) => (
                 <tr key={idx} className="text-center hover:bg-gray-50 leading-none">
                   <td className="border-2 border-black p-3 text-[10px] font-black text-left uppercase leading-tight">{student.full_name}</td>
-
+                  <td className="border-2 border-black p-3 text-[9px] font-black text-center italic bg-gray-50/50">
+    {student.pre_test_score || "Girilmedi"}
+</td>
                   {/* PDF Sütunu İçindeki Haftalık Analiz Hücresi */}
                   {student.weekly_breakdown.map((week, wIdx) => (
                     <td key={wIdx} className="border-2 border-black p-1 text-[6px] font-bold leading-none align-top">
@@ -571,37 +621,121 @@ export default function TeacherDashboard() {
 
 
 
-              {weekNumber === 1 && (
-                <div className="mb-10 p-6 md:p-8 bg-gradient-to-br from-red-50 to-white rounded-3xl border-2 border-[#ce1212]/20 shadow-sm space-y-6 text-left leading-normal text-left">
-                  <div className="flex items-center gap-3 text-[#ce1212] border-b border-red-100 pb-4 leading-none text-left">
-                    <ShieldCheck size={24} className="text-left" />
-                    <div className="text-left leading-none text-left text-left">
-                      <h3 className="font-black uppercase text-[10px] md:text-xs tracking-widest leading-none text-left uppercase text-left text-left">SİSTEM GENELİ ORYANTASYON VİDEOSU</h3>
-                      <p className="text-[9px] text-gray-400 font-bold mt-2 uppercase tracking-tighter text-left leading-none">* Sisteme girişte izlenmesi zorunlu olan rehber içeriktir.</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 leading-none text-left">
-                    <div className="text-left leading-none text-left">
-                      <label className="flex items-center gap-2 text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest text-left leading-none"><Type size={12} className="text-left" /> Oryantasyon Başlığı</label>
-                      <input type="text" value={introTitle} onChange={(e) => setIntroTitle(e.target.value)} className="w-full p-3.5 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:border-red-500 bg-white leading-none text-left" />
-                    </div>
-                    <div className="text-left leading-none text-left">
-                      <label className="flex items-center gap-2 text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest text-left leading-none"><PlayCircle size={12} className="text-left" /> Video Embed URL</label>
-                      <input type="url" value={introVideoUrl} onChange={(e) => setIntroVideoUrl(e.target.value)} className="w-full p-3.5 rounded-xl border border-gray-200 text-xs font-mono outline-none focus:border-red-500 bg-white leading-none text-left" />
-                    </div>
-                    <div className="md:col-span-4 text-left leading-none mt-4">
-                      <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest text-left">Oryantasyon Metni (Opsiyonel)</label>
-                      <textarea
-                        value={introDescription}
-                        onChange={(e) => setIntroDescription(e.target.value)}
-                        rows={4}
-                        className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-black font-bold outline-none focus:border-red-500 transition-all text-sm shadow-inner leading-relaxed text-left"
-                        placeholder="Hoş geldiniz metni veya sistem rehberini buraya yazabilirsiniz..."
-                      />
-                    </div>
-                  </div>
+             {weekNumber === 1 && (
+  <div className="space-y-10 animate-in fade-in slide-in-from-top-4 duration-500">
+    {/* 1. KISIM: ORYANTASYON VİDEOSU VE METNİ */}
+    <div className="p-6 md:p-8 bg-gradient-to-br from-red-50 to-white rounded-3xl border-2 border-[#ce1212]/20 shadow-sm space-y-6 text-left leading-normal">
+      <div className="flex items-center gap-3 text-[#ce1212] border-b border-red-100 pb-4 leading-none">
+        <ShieldCheck size={24} />
+        <div className="text-left leading-none">
+          <h3 className="font-black uppercase text-[10px] md:text-xs tracking-widest leading-none">SİSTEM GENELİ ORYANTASYON VİDEOSU</h3>
+          <p className="text-[9px] text-gray-400 font-bold mt-2 uppercase tracking-tighter">* Sisteme girişte izlenmesi zorunlu olan rehber içeriktir.</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 leading-none">
+        <div className="text-left">
+          <label className="flex items-center gap-2 text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest"><Type size={12} /> Oryantasyon Başlığı</label>
+          <input type="text" value={introTitle} onChange={(e) => setIntroTitle(e.target.value)} className="w-full p-3.5 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:border-red-500 bg-white" />
+        </div>
+        <div className="text-left">
+          <label className="flex items-center gap-2 text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest"><PlayCircle size={12} /> Video Embed URL</label>
+          <input type="url" value={introVideoUrl} onChange={(e) => setIntroVideoUrl(e.target.value)} className="w-full p-3.5 rounded-xl border border-gray-200 text-xs font-mono outline-none focus:border-red-500 bg-white" />
+        </div>
+        <div className="md:col-span-2 text-left mt-4">
+          <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Oryantasyon Metni (Opsiyonel)</label>
+          <textarea
+            value={introDescription}
+            onChange={(e) => setIntroDescription(e.target.value)}
+            rows={4}
+            className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-black font-bold outline-none focus:border-red-500 transition-all text-sm shadow-inner leading-relaxed"
+            placeholder="Hoş geldiniz metni veya sistem rehberini buraya yazabilirsiniz..."
+          />
+        </div>
+      </div>
+    </div>
+
+    {/* 2. KISIM: ÖN DEĞERLENDİRME TESTİ DÜZENLEYİCİ */}
+    <div className="p-6 md:p-8 bg-gradient-to-br from-blue-50 to-white rounded-3xl border-2 border-blue-200 shadow-sm space-y-6 text-left leading-normal">
+      <div className="flex items-center justify-between border-b border-blue-100 pb-4">
+        <div className="flex items-center gap-3 text-blue-600 leading-none">
+          <ListChecks size={24} />
+          <div>
+            <h3 className="font-black uppercase text-[10px] md:text-xs tracking-widest leading-none">ÖN DEĞERLENDİRME TESTİ (ZORUNLU)</h3>
+            <p className="text-[9px] text-gray-400 font-bold mt-2 uppercase tracking-tighter">* Öğrenciler bu testi tamamlamadan haftalık derslere erişemezler.</p>
+          </div>
+        </div>
+        <button 
+          type="button" 
+          onClick={() => setPreTestQuestions([...preTestQuestions, { question_text: "", options: [{option_text: "", is_correct: true}, {option_text: "", is_correct: false}, {option_text: "", is_correct: false}, {option_text: "", is_correct: false}, {option_text: "", is_correct: false}] }])}
+          className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black hover:bg-blue-700 transition-all shadow-lg active:scale-95"
+        >
+          + YENİ SORU EKLE
+        </button>
+      </div>
+
+      <div className="space-y-8">
+        {preTestQuestions.map((q, qIndex) => (
+          <div key={qIndex} className="p-5 md:p-7 bg-white rounded-[2rem] border border-blue-100 shadow-sm space-y-5 relative group">
+            <button 
+              type="button" 
+              onClick={() => setPreTestQuestions(preTestQuestions.filter((_, i) => i !== qIndex))} 
+              className="absolute top-6 right-6 text-gray-300 hover:text-red-500 transition-colors"
+            >
+              <Trash2 size={20} />
+            </button>
+
+            <div className="flex gap-4 items-start pr-10">
+              <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center font-black shrink-0 shadow-blue-200 shadow-lg text-sm">{qIndex + 1}</span>
+              <div className="w-full">
+                <label className="block text-[9px] font-black text-gray-400 uppercase mb-1 tracking-widest">Soru Metni</label>
+                <input 
+                  type="text" 
+                  placeholder="Örn: Yapay zekanın temel amacı nedir?" 
+                  className="w-full p-2 border-b-2 border-gray-50 focus:border-blue-500 outline-none font-bold text-sm bg-transparent"
+                  value={q.question_text}
+                  onChange={(e) => {
+                    const newQs = [...preTestQuestions];
+                    newQs[qIndex].question_text = e.target.value;
+                    setPreTestQuestions(newQs);
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pl-12">
+              {q.options.map((opt, oIndex) => (
+                <div key={oIndex} className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition-all ${opt.is_correct ? 'bg-green-50 border-green-500' : 'bg-gray-50 border-gray-100'}`}>
+                  <button 
+                    type="button" 
+                    onClick={() => {
+                      const newQs = [...preTestQuestions];
+                      newQs[qIndex].options.forEach((o, i) => o.is_correct = i === oIndex);
+                      setPreTestQuestions(newQs);
+                    }}
+                    className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${opt.is_correct ? 'bg-green-500 text-white shadow-green-200 shadow-lg' : 'bg-white text-gray-300 border'}`}
+                  >
+                    <Check size={14} />
+                  </button>
+                  <input 
+                    type="text" 
+                    placeholder={`${oIndex + 1}. Seçenek`}
+                    className="bg-transparent outline-none text-[11px] font-bold w-full text-secondary"
+                    value={opt.option_text}
+                    onChange={(e) => {
+                      const newQs = [...preTestQuestions];
+                      newQs[qIndex].options[oIndex].option_text = e.target.value;
+                      setPreTestQuestions(newQs);
+                    }}
+                  />
                 </div>
-              )}
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)}
 
               <div className="space-y-6 text-left leading-normal text-left text-left text-left">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-100 pb-4 gap-4 leading-none text-left">
@@ -745,22 +879,28 @@ export default function TeacherDashboard() {
               <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto leading-none text-left">
                 <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-xl border border-gray-200 text-left text-left">
                   <Filter size={16} className="text-gray-400 text-left" />
-                  <select value={selectedDepartment} onChange={(e) => setSelectedDepartment(e.target.value)} className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer text-left">
-                    <option value="all" className="text-left">Tüm Bölümler</option>
-                    {departmentList.map(d => <option key={d.id} value={d.id} className="text-left">{d.name}</option>)}
-                  </select>
+                  <select 
+  value={selectedDepartment} 
+  onChange={(e) => setSelectedDepartment(e.target.value)} 
+  className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer text-left"
+>
+  {/* 'all' seçeneği tamamen kaldırıldı */}
+  {departmentList.map(d => (
+    <option key={d.id} value={d.id} className="text-left">
+      {d.name}
+    </option>
+  ))}
+</select>
                 </div>
                 {/* PDF RAPOR BUTONU DÜZENLEMESİ */}
                 <button
-                  onClick={handlePrintAll}
-                  className="flex items-center justify-center gap-3 bg-red-700 hover:bg-red-800 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all leading-none active:scale-95 text-left"
-                >
-                  <FileText size={18} className="text-left" />
-                  {selectedDepartment === 'all'
-                    ? "TÜM BÖLÜMLER"
-                    : getDeptName(selectedDepartment).toUpperCase()
-                  } PDF RAPORU
-                </button>
+  onClick={handlePrintAll}
+  className="flex items-center justify-center gap-3 bg-red-700 hover:bg-red-800 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all leading-none active:scale-95 text-left"
+>
+  <FileText size={18} className="text-left" />
+  {/* Artık 'all' kontrolüne gerek yok, direkt seçili bölümü basıyoruz */}
+  {getDeptName(selectedDepartment).toUpperCase()} PDF RAPORU
+</button>
               </div>
             </div>
 
@@ -866,6 +1006,38 @@ export default function TeacherDashboard() {
                 <X size={24} />
               </button>
             </div>
+            {/* --- YENİ: ÖN TEST (BAŞLANGIÇ SEVİYESİ) KARTI --- */}
+{selectedStudent?.pre_test_data && (
+  <div className="mx-6 md:mx-10 mt-6 p-5 bg-gradient-to-r from-purple-50 to-white border-l-8 border-purple-500 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4 animate-in slide-in-from-top-2 duration-500">
+    <div className="flex items-center gap-4">
+      <div className="bg-purple-500 p-3 rounded-xl text-white shadow-lg shrink-0">
+        <GraduationCap size={24} />
+      </div>
+      <div className="text-left leading-tight">
+        <p className="text-[10px] font-black text-purple-600 uppercase tracking-[0.2em] mb-1">
+          SİSTEM GİRİŞ SEVİYESİ (ÖN TEST)
+        </p>
+        <p className="text-xl font-black text-secondary uppercase leading-none">
+          BAŞARI SKORU: %{selectedStudent.pre_test_data.score}
+        </p>
+        <p className="text-[9px] text-gray-400 font-bold mt-1 uppercase">
+          Tamamlanma Tarihi: {selectedStudent.pre_test_data.date}
+        </p>
+      </div>
+    </div>
+    
+    <div className="flex gap-4">
+      <div className="px-4 py-2 bg-white rounded-xl border border-purple-100 shadow-sm text-center min-w-[70px]">
+        <p className="text-[8px] font-bold text-gray-400 uppercase leading-none mb-1">Doğru</p>
+        <p className="text-sm font-black text-green-600 leading-none">{selectedStudent.pre_test_data.correct}</p>
+      </div>
+      <div className="px-4 py-2 bg-white rounded-xl border border-purple-100 shadow-sm text-center min-w-[70px]">
+        <p className="text-[8px] font-bold text-gray-400 uppercase leading-none mb-1">Yanlış</p>
+        <p className="text-sm font-black text-red-600 leading-none">{selectedStudent.pre_test_data.wrong}</p>
+      </div>
+    </div>
+  </div>
+)}
 
             {/* HAFTALIK DETAYLAR LİSTESİ */}
             <div className="flex-1 overflow-y-auto p-4 md:p-10 space-y-8 bg-white custom-scrollbar text-left leading-normal">
