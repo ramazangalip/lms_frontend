@@ -9,7 +9,7 @@ export default function GuidePage() {
 
   // URL Tanımlamaları
   const guideVideoUrl = "https://www.youtube.com/embed/ulFHl4c0QpE"; // 1. Video
-  const extraVideoUrl = "https://www.youtube.com/embed/ulFHl4c0QpE"; // 2. Video (Burayı değiştirirsin)
+  const extraVideoUrl = "https://www.youtube.com/embed/SLgnIETCQ-s?si=tP3VzuCWgaHtvnTZ"; // 2. Video (Burayı değiştirirsin)
   const apkDownloadUrl = "https://drive.google.com/uc?export=download&id=12XsXnDRLBm2zyAQh-blITQGYGaBuO4z_"; // APK Linki güncellendi
 
   return (
