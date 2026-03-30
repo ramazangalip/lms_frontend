@@ -237,45 +237,81 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
   };
 
   // --- HAFTA DETAYI ÇEKME ---
+  // --- HAFTA DETAYI ÇEKME ---
   const fetchWeekDetail = useCallback(async (week: number) => {
     setFetchingWeek(true);
     try {
       const res = await api.get(`/contents/list/?week_number=${week}`);
       const data = res.data;
+      
+      // Temel İçerik Bilgileri
       setIntroDescription(data.intro_description || '');
       setTitle(data.title || '');
       setDescription(data.description || '');
 
+      // Tarih Formatlama
       if (data.release_date) {
         setReleaseDate(data.release_date.split('T')[0]);
       } else {
         setReleaseDate('');
       }
 
+      // Oryantasyon Bilgileri
       if (data.intro_video_url !== undefined) {
         setIntroVideoUrl(data.intro_video_url || '');
         setIntroTitle(data.intro_title || 'Genel Tanıtım ve Oryantasyon');
       }
 
+      // Materyaller
       if (data.materials && data.materials.length > 0) {
         setMaterials(data.materials);
       } else {
         setMaterials([{ content_type: 'video', embed_url: '', title: '', point_value: 10 }]);
       }
 
+      // Flashcardlar
       setFlashcards(data.flashcards || []);
 
+      // --- KRİTİK GÜNCELLEME: ÖN TEST SORULARINI YÜKLE ---
+      if (week === 1) {
+        if (data.pre_test_questions && data.pre_test_questions.length > 0) {
+          // Eğer veritabanında soru varsa onları state'e bas
+          setPreTestQuestions(data.pre_test_questions);
+        } else {
+          // Eğer veritabanı boşsa (yeni kurulum), hoca için 1 tane boş taslak soru bırak
+          setPreTestQuestions([
+            {
+              question_text: "",
+              options: [
+                { option_text: "", is_correct: true },
+                { option_text: "", is_correct: false },
+                { option_text: "", is_correct: false },
+                { option_text: "", is_correct: false },
+                { option_text: "", is_correct: false }
+              ]
+            }
+          ]);
+        }
+      } else {
+        // 1. haftada değilsek, state'i temizle (bellek yönetimi için)
+        setPreTestQuestions([]);
+      }
+
     } catch (err) {
+      console.error("Haftalık veriler çekilemedi:", err);
+      // Hata durumunda formu sıfırla
       setTitle('');
       setDescription('');
       setReleaseDate('');
       setMaterials([{ content_type: 'video', embed_url: '', title: '', point_value: 10 }]);
       setFlashcards([]);
+      setPreTestQuestions([]);
     } finally {
       setFetchingWeek(false);
     }
   }, []);
 
+  // --- İZLEYİCİ (TRIGGER) ---
   useEffect(() => {
     if (activeTab === 'content') {
       fetchWeekDetail(weekNumber);
