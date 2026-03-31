@@ -10,7 +10,7 @@ export default function GuidePage() {
   // URL Tanımlamaları
   const guideVideoUrl = "https://www.youtube.com/embed/ulFHl4c0QpE"; // 1. Video
   const extraVideoUrl = "https://www.youtube.com/embed/SLgnIETCQ-s?si=tP3VzuCWgaHtvnTZ"; // 2. Video (Burayı değiştirirsin)
-  const apkDownloadUrl = "https://drive.google.com/uc?export=download&id=12XsXnDRLBm2zyAQh-blITQGYGaBuO4z_"; // APK Linki güncellendi
+  const apkDownloadUrl = "https://drive.google.com/uc?export=download&id=1ezJVz7CgRQbxn5zyWZ6Lp9Sh8Ej9yoDz";
 
   return (
     <div className="min-h-screen bg-gray-50 font-roboto flex flex-col items-center py-10 px-6 text-left">
