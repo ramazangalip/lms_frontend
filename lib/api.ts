@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // Backend adresini merkezi olarak buradan yönetiyoruz
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000/api',
+  baseURL: 'https:/api.yapayzekadesteklisinif.com.tr/api',
 });
 
 // Axios Interceptor: Her istek gönderilmeden hemen önce araya girer
