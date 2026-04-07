@@ -78,6 +78,16 @@ interface QuizDetailAnalysis {
   is_correct: boolean;
 }
 
+interface ChatbotReportData {
+  student_name: string;
+  total_count: number;
+  questions: {
+    text: string;
+    week: number | string;
+    date: string;
+  }[];
+}
+
 interface WeeklyProgress {
   week_number: number;
   progress: number;
@@ -172,6 +182,7 @@ export default function TeacherDashboard() {
 
   const [materials, setMaterials] = useState<Material[]>([{ content_type: 'video', embed_url: '', title: '', point_value: 10 }]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
+  const [chatbotData, setChatbotData] = useState<ChatbotReportData[]>([]);
 
   // --- BÖLÜM LİSTESİ ---
   const departmentList = [
@@ -359,6 +370,52 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
     }
   }, [activeTab, selectedDepartment, fetchAnalytics]); // <-- selectedDepartment buraya eklendi!
 
+  const fetchChatbotAnalytics = useCallback(async () => {
+  if (!selectedDepartment || selectedDepartment === 'all') return;
+  
+  try {
+    const res = await api.get(`/contents/chatbot-analytics/?department=${selectedDepartment}`);
+    setChatbotData(res.data);
+  } catch (err) {
+    console.error("Chatbot verileri yüklenemedi:", err);
+  }
+}, [selectedDepartment]);
+
+// useEffect içinde tetikle
+useEffect(() => {
+  if (activeTab === 'analytics') {
+    fetchAnalytics();
+    fetchChatbotAnalytics(); // İkisini de aynı anda çekiyoruz
+  }
+}, [activeTab, fetchAnalytics, fetchChatbotAnalytics]);
+
+const handlePrintChatbot = () => {
+    // Akademik raporu tamamen gizle, chatbot raporunu göster
+    const academicReport = document.getElementById('bulk-report-pdf');
+    const chatbotReport = document.getElementById('chatbot-report-pdf');
+    
+    if (academicReport) academicReport.style.display = 'none';
+    if (chatbotReport) chatbotReport.style.display = 'block';
+    
+    window.print();
+    
+    // Yazdırma penceresi kapandıktan sonra ekranı eski haline getir (opsiyonel)
+    if (chatbotReport) chatbotReport.style.display = 'none';
+  };
+
+  const handlePrintAcademic = () => {
+    // Chatbot raporunu tamamen gizle, akademik raporu göster
+    const academicReport = document.getElementById('bulk-report-pdf');
+    const chatbotReport = document.getElementById('chatbot-report-pdf');
+    
+    if (chatbotReport) chatbotReport.style.display = 'none';
+    if (academicReport) academicReport.style.display = 'block';
+    
+    window.print();
+    
+    if (academicReport) academicReport.style.display = 'none';
+  };
+
   // --- FİLTRELEME HESAPLAMALARI ---
   // Backend zaten filtreli gönderdiği için ekstra işlem yapmadan veriyi doğrudan döndürüyoruz.
   const filteredAnalytics = useMemo(() => {
@@ -499,99 +556,144 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
     <div className="min-h-screen bg-gray-50 font-roboto text-secondary text-left">
 
 
-      {/* 1. PDF ŞABLONU (Gizli - Sadece Yazıcıda Görünür) */}
-      {/* ---------------------------------------------------------------- */}
-      <div id="bulk-report-pdf" className="hidden print:block bg-white p-0 text-left">
-        <div className="p-10 text-left">
-          {/* LOGO VE BAŞLIK */}
-          <div className="flex flex-col items-center mb-10 border-b-4 border-black pb-8 text-center">
-            <img src="/okul-logo.png" alt="Okul Logosu" className="h-28 object-contain mb-6" onError={(e) => (e.currentTarget.style.display = 'none')} />
-            <h1 className="text-3xl font-black uppercase tracking-tighter text-black">SİSTEM GENELİ AKADEMİK GELİŞİM VE PERFORMANS ÇİZELGESİ</h1>
-            <p className="text-lg font-bold text-gray-700 mt-2 uppercase tracking-widest">
-              Bölüm: {selectedDepartment === 'all' ? 'TÜM BÖLÜMLER' : getDeptName(selectedDepartment).toUpperCase()}
-            </p>
-            <div className="flex gap-10 mt-4 text-[10px] font-black uppercase text-gray-500">
-              <span>Ders: Dijital Okuryazarlık</span>
-              <span>Rapor Tarihi: {new Date().toLocaleDateString('tr-TR')}</span>
-              <span>Kayıtlı Öğrenci: {filteredBulkData.length}</span>
-            </div>
-          </div>
-
-          {/* ANA TABLO */}
-          <table className="w-full border-collapse border-2 border-black">
-            <thead>
-              <tr className="bg-black text-white text-center">
-                <th className="border-2 border-black p-3 text-[10px] font-black uppercase leading-none text-left w-48">Öğrenci Adı Soyadı</th>
-                <th className="border-2 border-black p-3 text-[10px] font-black uppercase leading-none text-center bg-gray-200">
-  ÖN TEST
-</th>
-                {Array.from({ length: 14 }, (_, i) => i + 1).map(n => (
-                  <th key={n} className="border-2 border-black p-1 text-[7px] font-black uppercase leading-none text-center w-32">
-                    H.{n} ANALİZİ
-                  </th>
-                ))}
-                <th className="border-2 border-black p-3 text-[10px] font-black uppercase leading-none text-center bg-gray-800">Top. Puan</th>
-                <th className="border-2 border-black p-3 text-[10px] font-black uppercase text-center bg-gray-800">Top. Süre</th>
-              </tr>
-            </thead>
-            <tbody className="text-left font-bold">
-              {filteredBulkData.map((student, idx) => (
-                <tr key={idx} className="text-center hover:bg-gray-50 leading-none">
-                  <td className="border-2 border-black p-3 text-[10px] font-black text-left uppercase leading-tight">{student.full_name}</td>
-                  <td className="border-2 border-black p-3 text-[9px] font-black text-center italic bg-gray-50/50">
-    {student.pre_test_score || "Girilmedi"}
-</td>
-                  {/* PDF Sütunu İçindeki Haftalık Analiz Hücresi */}
-                  {student.weekly_breakdown.map((week, wIdx) => (
-                    <td key={wIdx} className="border-2 border-black p-1 text-[6px] font-bold leading-none align-top">
-                      <div className="flex flex-col gap-1.5">
-                        {/* TUR 1 VERİLERİ */}
-                        <div className="flex flex-col border-b border-gray-300 pb-1 w-full items-center bg-blue-50/30">
-                          <div className="flex justify-between w-full px-1 mb-0.5">
-                            <span className="text-gray-500 font-black scale-[0.8]">T1</span>
-                            <span className="text-blue-700 font-black">%{Math.round(week.progress)}</span>
-                          </div>
-                          <div className="flex flex-col items-center gap-0.5">
-                            <span className="text-[5px] text-gray-700">{week.correct}D / {week.wrong}Y</span>
-                            <span className="text-[5px] text-blue-600 font-black">{formatDuration(week.duration_seconds)}</span>
-                          </div>
-                        </div>
-
-                        {/* --- KRİTİK EKLEME: TÜM MATERYALLERİN DETAYLI LİSTESİ --- */}
-                        <div className="flex flex-col gap-1 px-0.5">
-                          <p className="text-[4px] font-black text-gray-400 uppercase border-b border-gray-100 mb-1 text-left">Materyal Süreleri:</p>
-                          {week.material_details && week.material_details.length > 0 ? (
-                            week.material_details.map((mat, mi) => (
-                              <div key={mi} className="flex justify-between items-start gap-1 text-[4.5px] text-gray-600 leading-[1.2] mb-0.5">
-                                <span className="text-left break-words w-20">• {mat.title}</span>
-                                <span className="font-black shrink-0 text-secondary">{formatDuration(mat.duration_seconds)}</span>
-                              </div>
-                            ))
-                          ) : (
-                            <span className="text-[4px] text-gray-300 italic text-center">Aktivite Yok</span>
-                          )}
-                        </div>
-
-                        {/* TUR 2 VERİLERİ (VARSA) */}
-                        {week.is_round_2_started ? (
-                          <div className="flex flex-col w-full items-center pt-1 border-t-2 border-amber-200 bg-amber-50/30 mt-auto">
-                            <span className="text-amber-600 font-black scale-[0.7]">T2 AKTİF</span>
-                            <span className="text-green-700 font-black">{week.correct_2}D / {week.wrong_2}Y</span>
-                            <span className="text-[5px] text-amber-700 font-bold">{formatDuration(week.duration_seconds_2)}</span>
-                          </div>
-                        ) : null}
-                      </div>
-                    </td>
-                  ))}
-
-                  <td className="border-2 border-black p-3 text-sm font-black text-blue-800 bg-gray-50">{student.total_points} P.</td>
-                  <td className="border-2 border-black p-3 text-[9px] font-black leading-none bg-gray-50 italic">{formatDuration(student.total_time)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+     {/* 1. PDF ŞABLONU (Gizli - Sadece Yazıcıda Görünür) */}
+<div id="bulk-report-pdf" className="hidden print:block bg-white p-0 text-left">
+  {/* Veriyi 6'şarlı gruplara bölerek haritalıyoruz */}
+  {Array.from({ length: Math.ceil(filteredBulkData.length / 6) }, (_, i) =>
+    filteredBulkData.slice(i * 6, i * 6 + 6)
+  ).map((studentGroup, pageIdx) => (
+    <div key={pageIdx} className="p-10 text-left" style={{ pageBreakAfter: 'always' }}>
+      {/* LOGO VE BAŞLIK (Her sayfanın başında tekrar eder) */}
+      <div className="flex flex-col items-center mb-10 border-b-4 border-black pb-8 text-center">
+        <img src="/okul-logo.png" alt="Okul Logosu" className="h-28 object-contain mb-6" onError={(e) => (e.currentTarget.style.display = 'none')} />
+        <h1 className="text-3xl font-black uppercase tracking-tighter text-black">SİSTEM GENELİ AKADEMİK GELİŞİM VE PERFORMANS ÇİZELGESİ</h1>
+        <p className="text-lg font-bold text-gray-700 mt-2 uppercase tracking-widest">
+          Bölüm: {getDeptName(selectedDepartment).toUpperCase()} (Sayfa {pageIdx + 1})
+        </p>
+        <div className="flex gap-10 mt-4 text-[10px] font-black uppercase text-gray-500">
+          <span>Ders: Dijital Okuryazarlık</span>
+          <span>Rapor Tarihi: {new Date().toLocaleDateString('tr-TR')}</span>
+          <span>Gruptaki Öğrenci: {studentGroup.length}</span>
         </div>
       </div>
+
+      {/* GRUP TABLOSU */}
+      <table className="w-full border-collapse border-2 border-black">
+        <thead>
+          <tr className="bg-black text-white text-center">
+            <th className="border-2 border-black p-3 text-[10px] font-black uppercase leading-none text-left w-48">Öğrenci Adı Soyadı</th>
+            <th className="border-2 border-black p-3 text-[10px] font-black uppercase leading-none text-center bg-gray-200">ÖN TEST</th>
+            {Array.from({ length: 14 }, (_, i) => i + 1).map(n => (
+              <th key={n} className="border-2 border-black p-1 text-[7px] font-black uppercase leading-none text-center w-32">
+                H.{n} ANALİZİ
+              </th>
+            ))}
+            <th className="border-2 border-black p-3 text-[10px] font-black uppercase leading-none text-center bg-gray-800">Top. Puan</th>
+            <th className="border-2 border-black p-3 text-[10px] font-black uppercase text-center bg-gray-800">Top. Süre</th>
+          </tr>
+        </thead>
+        <tbody className="text-left font-bold">
+          {studentGroup.map((student, idx) => (
+            <tr key={idx} className="text-center hover:bg-gray-50 leading-none">
+              <td className="border-2 border-black p-3 text-[10px] font-black text-left uppercase leading-tight">{student.full_name}</td>
+              <td className="border-2 border-black p-3 text-[9px] font-black text-center italic bg-gray-50/50">
+                {student.pre_test_score || "Girilmedi"}
+              </td>
+              
+              {student.weekly_breakdown.map((week, wIdx) => (
+                <td key={wIdx} className="border-2 border-black p-1 text-[6px] font-bold leading-none align-top">
+                  <div className="flex flex-col gap-1.5">
+                    {/* TUR 1 VERİLERİ */}
+                    <div className="flex flex-col border-b border-gray-300 pb-1 w-full items-center bg-blue-50/30">
+                      <div className="flex justify-between w-full px-1 mb-0.5">
+                        <span className="text-gray-500 font-black scale-[0.8]">T1</span>
+                        <span className="text-blue-700 font-black">%{Math.round(week.progress)}</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <span className="text-[5px] text-gray-700">{week.correct}D / {week.wrong}Y</span>
+                        <span className="text-[5px] text-blue-600 font-black">{formatDuration(week.duration_seconds)}</span>
+                      </div>
+                    </div>
+
+                    {/* MATERYAL DETAYLARI */}
+                    <div className="flex flex-col gap-1 px-0.5">
+                      <p className="text-[4px] font-black text-gray-400 uppercase border-b border-gray-100 mb-1 text-left">Materyal Süreleri:</p>
+                      {week.material_details && week.material_details.length > 0 ? (
+                        week.material_details.map((mat, mi) => (
+                          <div key={mi} className="flex justify-between items-start gap-1 text-[4.5px] text-gray-600 leading-[1.2] mb-0.5">
+                            <span className="text-left break-words w-20">• {mat.title}</span>
+                            <span className="font-black shrink-0 text-secondary">{formatDuration(mat.duration_seconds)}</span>
+                          </div>
+                        ))
+                      ) : (
+                        <span className="text-[4px] text-gray-300 italic text-center">Aktivite Yok</span>
+                      )}
+                    </div>
+
+                    {/* TUR 2 VERİLERİ */}
+                    {week.is_round_2_started ? (
+                      <div className="flex flex-col w-full items-center pt-1 border-t-2 border-amber-200 bg-amber-50/30 mt-auto">
+                        <span className="text-amber-600 font-black scale-[0.7]">T2 AKTİF</span>
+                        <span className="text-green-700 font-black">{week.correct_2}D / {week.wrong_2}Y</span>
+                        <span className="text-[5px] text-amber-700 font-bold">{formatDuration(week.duration_seconds_2)}</span>
+                      </div>
+                    ) : null}
+                  </div>
+                </td>
+              ))}
+
+              <td className="border-2 border-black p-3 text-sm font-black text-blue-800 bg-gray-50">{student.total_points} P.</td>
+              <td className="border-2 border-black p-3 text-[9px] font-black leading-none bg-gray-50 italic">{formatDuration(student.total_time)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  ))}
+</div>
+      {/* CHATBOT PDF RAPORU - SADECE YAZICIDA GÖRÜNÜR */}
+<div id="chatbot-report-pdf" className="hidden print:block bg-white p-0 text-left">
+  <div className="p-10">
+    <div className="flex flex-col items-center mb-10 border-b-4 border-blue-600 pb-8 text-center">
+      <img src="/okul-logo.png" className="h-24 mb-4" onError={(e) => e.currentTarget.style.display='none'} />
+      <h1 className="text-2xl font-black uppercase text-blue-900">YAPAY ZEKA ETKİLEŞİM VE SORU ANALİZİ</h1>
+      <p className="text-lg font-bold text-gray-700 mt-2 uppercase italic">Bölüm: {getDeptName(selectedDepartment).toUpperCase()}</p>
+      <p className="text-[10px] font-black text-gray-400 mt-2">TARİH: {new Date().toLocaleDateString('tr-TR')}</p>
+    </div>
+
+    <table className="w-full border-collapse border-2 border-blue-900">
+      <thead>
+        <tr className="bg-blue-900 text-white text-[10px] font-black uppercase">
+          <th className="border border-blue-900 p-3 w-1/4 text-left">Öğrenci Adı Soyadı</th>
+          <th className="border border-blue-900 p-3 w-20">Soru Adedi</th>
+          <th className="border border-blue-900 p-3 text-left">Sorduğu Sorular</th>
+        </tr>
+      </thead>
+      <tbody>
+        {chatbotData.map((row, i) => (
+          <tr key={i} className="text-[9px] align-top">
+            <td className="border border-blue-200 p-3 font-black bg-blue-50/50 uppercase">{row.student_name}</td>
+            <td className="border border-blue-200 p-3 text-center font-black text-blue-700 text-sm bg-blue-50/30">{row.total_count}</td>
+            <td className="border border-blue-200 p-3">
+              <div className="flex flex-col gap-2">
+                {row.questions.map((q, qi) => (
+                  <div key={qi} className="bg-gray-50 p-2 rounded-lg border border-gray-200">
+                    <div className="flex justify-between items-center mb-1 text-[7px] font-black text-blue-400 uppercase italic">
+                      <span>{q.date}</span>
+                      <span>Hafta: {q.week}</span>
+                    </div>
+                    <p className="text-gray-800 leading-relaxed">"{q.text}"</p>
+                  </div>
+                ))}
+                {row.total_count === 0 && <span className="text-gray-300 italic uppercase font-bold text-[8px]">Henüz bir chatbot etkileşimi kaydedilmedi.</span>}
+              </div>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
 
       {/* ---------------------------------------------------------------- */}
       {/* 2. NORMAL ARAYÜZ (HEADER) */}
@@ -930,14 +1032,21 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
 </select>
                 </div>
                 {/* PDF RAPOR BUTONU DÜZENLEMESİ */}
-                <button
-  onClick={handlePrintAll}
-  className="flex items-center justify-center gap-3 bg-red-700 hover:bg-red-800 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all leading-none active:scale-95 text-left"
->
-  <FileText size={18} className="text-left" />
-  {/* Artık 'all' kontrolüne gerek yok, direkt seçili bölümü basıyoruz */}
-  {getDeptName(selectedDepartment).toUpperCase()} PDF RAPORU
-</button>
+                {/* AKADEMİK RAPOR BUTONU */}
+  <button
+    onClick={handlePrintAcademic}
+    className="flex items-center justify-center gap-3 bg-red-700 hover:bg-red-800 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all leading-none active:scale-95 text-left"
+  >
+    <FileText size={18} /> {getDeptName(selectedDepartment).toUpperCase()} AKADEMİK RAPOR
+  </button>
+
+  {/* CHATBOT RAPOR BUTONU */}
+  <button
+    onClick={handlePrintChatbot}
+    className="flex items-center justify-center gap-3 bg-blue-900 hover:bg-blue-950 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all leading-none active:scale-95 text-left"
+  >
+    <Bot size={18} /> {getDeptName(selectedDepartment).toUpperCase()} CHATBOT ANALİZİ
+  </button>
               </div>
             </div>
 

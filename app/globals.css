@@ -109,3 +109,18 @@ main .max-w-5xl {
 form {
   animation: fadeIn 0.5s ease-out;
 }
+
+@media print {
+  /* Diğer her şeyi gizle */
+  body * { visibility: hidden; }
+  
+  /* Sadece yazdırmak istediğimiz alanı göster (Hangi butona basıldıysa) */
+  /* Not: Pratik olması için şimdilik her iki raporu da peş peşe basar. */
+  #bulk-report-pdf, #bulk-report-pdf *, 
+  #chatbot-report-pdf, #chatbot-report-pdf * {
+    visibility: visible;
+  }
+
+  #bulk-report-pdf { position: absolute; left: 0; top: 0; width: 100%; }
+  #chatbot-report-pdf { page-break-before: always; } /* Chatbot raporu yeni sayfadan başlar */
+}
