@@ -163,8 +163,7 @@ interface StudentAnalytics {
 
 export default function TeacherDashboard() {
   // --- STATE YÖNETİMİ ---
-  const [activeTab, setActiveTab] = useState<'content' | 'analytics'>('content');
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'content' | 'analytics' | 'chatbot'>('content');  const [loading, setLoading] = useState(false);
   const [fetchingWeek, setFetchingWeek] = useState(false);
   const [analytics, setAnalytics] = useState<StudentAnalytics[]>([]);
   const [bulkData, setBulkData] = useState<BulkStudentData[]>([]);
@@ -372,6 +371,7 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
 
   const fetchChatbotAnalytics = useCallback(async () => {
   if (!selectedDepartment || selectedDepartment === 'all') return;
+  setChatbotData([]);
   
   try {
     const res = await api.get(`/contents/chatbot-analytics/?department=${selectedDepartment}`);
@@ -381,11 +381,12 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
   }
 }, [selectedDepartment]);
 
-// useEffect içinde tetikle
 useEffect(() => {
   if (activeTab === 'analytics') {
     fetchAnalytics();
-    fetchChatbotAnalytics(); // İkisini de aynı anda çekiyoruz
+  }
+  if (activeTab === 'chatbot') {
+    fetchChatbotAnalytics(); // Chatbot sekmesine girince veriyi çek
   }
 }, [activeTab, fetchAnalytics, fetchChatbotAnalytics]);
 
@@ -651,48 +652,68 @@ const handlePrintChatbot = () => {
     </div>
   ))}
 </div>
-      {/* CHATBOT PDF RAPORU - SADECE YAZICIDA GÖRÜNÜR */}
+{/* --- 2. CHATBOT ÖZEL PDF ŞABLONU (SADECE SORUSU OLANLAR VE HER SAYFADA TEK ÖĞRENCİ) --- */}
 <div id="chatbot-report-pdf" className="hidden print:block bg-white p-0 text-left">
-  <div className="p-10">
-    <div className="flex flex-col items-center mb-10 border-b-4 border-blue-600 pb-8 text-center">
-      <img src="/okul-logo.png" className="h-24 mb-4" onError={(e) => e.currentTarget.style.display='none'} />
-      <h1 className="text-2xl font-black uppercase text-blue-900">YAPAY ZEKA ETKİLEŞİM VE SORU ANALİZİ</h1>
-      <p className="text-lg font-bold text-gray-700 mt-2 uppercase italic">Bölüm: {getDeptName(selectedDepartment).toUpperCase()}</p>
-      <p className="text-[10px] font-black text-gray-400 mt-2">TARİH: {new Date().toLocaleDateString('tr-TR')}</p>
-    </div>
+  {/* SADECE SORU SAYISI 0'DAN BÜYÜK OLANLARI FİLTRELE VE BAS */}
+  {chatbotData
+    .filter(student => student.total_count > 0)
+    .map((student, pageIdx, filteredArray) => (
+    <div key={pageIdx} className="p-10 text-left min-h-screen flex flex-col" style={{ pageBreakAfter: 'always' }}>
+      
+      {/* LOGO VE BAŞLIK ALANI */}
+      <div className="flex flex-col items-center mb-8 border-b-4 border-[#1a1a1a] pb-6 text-center">
+        <img src="/okul-logo.png" alt="Okul Logosu" className="h-24 object-contain mb-4" onError={(e) => (e.currentTarget.style.display = 'none')} />
+        <h1 className="text-2xl font-black uppercase tracking-tighter text-[#1a1a1a]">YAPAY ZEKA ETKİLEŞİM VE SORU ANALİZİ</h1>
+        <p className="text-lg font-bold text-[#ce1212] mt-1 uppercase tracking-widest">
+          {getDeptName(selectedDepartment).toUpperCase()} BÖLÜMÜ
+        </p>
+        <div className="flex gap-8 mt-3 text-[10px] font-black uppercase text-gray-400">
+          <span>Rapor Tarihi: {new Date().toLocaleDateString('tr-TR')}</span>
+          <span className="text-[#1a1a1a]">Sorgu No: #AI-{student.total_count}-{pageIdx + 1}</span>
+        </div>
+      </div>
 
-    <table className="w-full border-collapse border-2 border-blue-900">
-      <thead>
-        <tr className="bg-blue-900 text-white text-[10px] font-black uppercase">
-          <th className="border border-blue-900 p-3 w-1/4 text-left">Öğrenci Adı Soyadı</th>
-          <th className="border border-blue-900 p-3 w-20">Soru Adedi</th>
-          <th className="border border-blue-900 p-3 text-left">Sorduğu Sorular</th>
-        </tr>
-      </thead>
-      <tbody>
-        {chatbotData.map((row, i) => (
-          <tr key={i} className="text-[9px] align-top">
-            <td className="border border-blue-200 p-3 font-black bg-blue-50/50 uppercase">{row.student_name}</td>
-            <td className="border border-blue-200 p-3 text-center font-black text-blue-700 text-sm bg-blue-50/30">{row.total_count}</td>
-            <td className="border border-blue-200 p-3">
-              <div className="flex flex-col gap-2">
-                {row.questions.map((q, qi) => (
-                  <div key={qi} className="bg-gray-50 p-2 rounded-lg border border-gray-200">
-                    <div className="flex justify-between items-center mb-1 text-[7px] font-black text-blue-400 uppercase italic">
-                      <span>{q.date}</span>
-                      <span>Hafta: {q.week}</span>
-                    </div>
-                    <p className="text-gray-800 leading-relaxed">"{q.text}"</p>
-                  </div>
-                ))}
-                {row.total_count === 0 && <span className="text-gray-300 italic uppercase font-bold text-[8px]">Henüz bir chatbot etkileşimi kaydedilmedi.</span>}
+      {/* ÖĞRENCİ KİMLİK KARTI */}
+      <div className="bg-[#1a1a1a] text-white p-6 rounded-t-3xl flex justify-between items-center shadow-lg">
+        <div className="text-left">
+          <p className="text-[10px] font-black text-red-500 uppercase tracking-[0.2em] mb-1">Öğrenci Adı Soyadı</p>
+          <h2 className="text-xl font-black uppercase">{student.student_name}</h2>
+        </div>
+        <div className="text-right bg-white/10 px-6 py-2 rounded-2xl border border-white/20">
+          <p className="text-[10px] font-black text-gray-400 uppercase leading-none mb-1">Toplam Soru</p>
+          <p className="text-2xl font-black leading-none text-red-500">{student.total_count}</p>
+        </div>
+      </div>
+
+      {/* SORULAR ALANI */}
+      <div className="border-2 border-[#1a1a1a] border-t-0 p-8 bg-white flex-1 rounded-b-3xl shadow-sm">
+        <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-6 border-b pb-2 flex items-center gap-2">
+           <Bot size={14} className="text-[#ce1212]" /> Aktif Chatbot Soru Geçmişi
+        </h3>
+        
+        <div className="space-y-6">
+          {student.questions.map((q, qIdx) => (
+            <div key={qIdx} className="bg-gray-50 p-5 rounded-2xl border-l-[10px] border-[#ce1212] shadow-sm relative overflow-hidden">
+              <div className="flex justify-between items-center font-black text-[9px] text-gray-400 uppercase italic mb-3">
+                <span className="flex items-center gap-1.5"><Calendar size={12} className="text-gray-300" /> {q.date}</span>
+                <span className="bg-[#1a1a1a] text-white px-4 py-1 rounded-full not-italic tracking-widest">HAFTA {q.week}</span>
               </div>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  </div>
+              
+              <p className="text-[#1a1a1a] font-bold text-sm leading-relaxed relative z-10 pr-6">
+                &quot; {q.text} &quot;
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* SAYFA ALTI BİLGİSİ */}
+      <div className="mt-auto pt-8 flex justify-between items-center border-t border-gray-100">
+        <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest italic">Sadece chatbot etkileşimi olan öğrenciler raporlanmıştır.</p>
+        <p className="text-[10px] font-black text-[#1a1a1a]">Sayfa {pageIdx + 1} / {filteredArray.length}</p>
+      </div>
+    </div>
+  ))}
 </div>
 
       {/* ---------------------------------------------------------------- */}
@@ -717,6 +738,12 @@ const handlePrintChatbot = () => {
             <button onClick={() => setActiveTab('analytics')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap leading-none ${activeTab === 'analytics' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
               <BarChart3 size={16} /> ÖĞRENCİ ANALİZLERİ
             </button>
+            <button 
+  onClick={() => setActiveTab('chatbot')} 
+  className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap leading-none ${activeTab === 'chatbot' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+>
+  <Bot size={16} /> CHATBOT ANALİZİ
+</button>
           </div>
 
           <button onClick={() => { localStorage.clear(); window.location.href = '/login'; }} className="w-full md:w-auto flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl text-white font-bold text-[10px] uppercase leading-none transition-all active:scale-95 text-left shadow-sm">
@@ -729,7 +756,9 @@ const handlePrintChatbot = () => {
       {/* 3. ANA İÇERİK (MAIN) */}
       {/* ---------------------------------------------------------------- */}
       <main className="max-w-6xl mx-auto p-4 md:p-12 pt-8 md:pt-12 print:hidden text-left">
-        {activeTab === 'content' ? (
+        
+        {/* --- SEKME 1: İÇERİK YÖNETİMİ --- */}
+        {activeTab === 'content' && (
           <form onSubmit={handleSubmit} className="space-y-8 animate-in fade-in slide-in-from-top-4 duration-500 text-left">
             <div className="bg-white p-5 md:p-10 rounded-3xl md:rounded-[2.5rem] shadow-2xl border border-gray-100 relative overflow-hidden text-left leading-normal">
               {fetchingWeek && (
@@ -742,196 +771,137 @@ const handlePrintChatbot = () => {
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10 text-left">
-                <div className="md:col-span-1 text-left leading-none text-left">
-                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest text-left leading-none">Düzenlenen Hafta</label>
-                  <select value={weekNumber} onChange={(e) => setWeekNumber(Number(e.target.value))} className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-black font-bold outline-none focus:border-red-500 transition-colors text-sm shadow-inner leading-none text-left">
+                <div className="md:col-span-1 text-left leading-none">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest leading-none">Düzenlenen Hafta</label>
+                  <select value={weekNumber} onChange={(e) => setWeekNumber(Number(e.target.value))} className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-black font-bold outline-none focus:border-red-500 transition-colors text-sm shadow-inner leading-none">
                     {Array.from({ length: 14 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. Hafta</option>)}
                   </select>
                 </div>
-                <div className="md:col-span-2 text-left leading-none text-left">
-                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest text-left leading-none">Haftalık Konu Başlığı</label>
-                  <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-black outline-none focus:border-red-500 font-bold transition-all text-sm shadow-inner leading-none text-left" placeholder="Haftanın ana başlığını giriniz..." />
+                <div className="md:col-span-2 text-left leading-none">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest leading-none">Haftalık Konu Başlığı</label>
+                  <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-black outline-none focus:border-red-500 font-bold transition-all text-sm shadow-inner leading-none" placeholder="Haftanın ana başlığını giriniz..." />
                 </div>
-                <div className="md:col-span-1 text-left leading-none text-left">
-                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest text-left leading-none">Erişim Tarihi (Kilit)</label>
-                  <input type="date" value={releaseDate} onChange={(e) => setReleaseDate(e.target.value)} className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 font-bold outline-none focus:border-red-500 shadow-inner leading-none text-left" />
+                <div className="md:col-span-1 text-left leading-none">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest leading-none">Erişim Tarihi (Kilit)</label>
+                  <input type="date" value={releaseDate} onChange={(e) => setReleaseDate(e.target.value)} className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 font-bold outline-none focus:border-red-500 shadow-inner leading-none" />
                 </div>
               </div>
 
+              {weekNumber === 1 && (
+                <div className="space-y-10 animate-in fade-in slide-in-from-top-4 duration-500">
+                  <div className="p-6 md:p-8 bg-gradient-to-br from-red-50 to-white rounded-3xl border-2 border-[#ce1212]/20 shadow-sm space-y-6 text-left leading-normal">
+                    <div className="flex items-center gap-3 text-[#ce1212] border-b border-red-100 pb-4 leading-none">
+                      <ShieldCheck size={24} />
+                      <div className="text-left leading-none">
+                        <h3 className="font-black uppercase text-[10px] md:text-xs tracking-widest leading-none">SİSTEM GENELİ ORYANTASYON VİDEOSU</h3>
+                        <p className="text-[9px] text-gray-400 font-bold mt-2 uppercase tracking-tighter">* Sisteme girişte izlenmesi zorunlu olan rehber içeriktir.</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 leading-none">
+                      <div className="text-left">
+                        <label className="flex items-center gap-2 text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest"><Type size={12} /> Oryantasyon Başlığı</label>
+                        <input type="text" value={introTitle} onChange={(e) => setIntroTitle(e.target.value)} className="w-full p-3.5 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:border-red-500 bg-white" />
+                      </div>
+                      <div className="text-left">
+                        <label className="flex items-center gap-2 text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest"><PlayCircle size={12} /> Video Embed URL</label>
+                        <input type="url" value={introVideoUrl} onChange={(e) => setIntroVideoUrl(e.target.value)} className="w-full p-3.5 rounded-xl border border-gray-200 text-xs font-mono outline-none focus:border-red-500 bg-white" />
+                      </div>
+                      <div className="md:col-span-2 text-left mt-4">
+                        <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Oryantasyon Metni (Opsiyonel)</label>
+                        <textarea value={introDescription} onChange={(e) => setIntroDescription(e.target.value)} rows={4} className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-black font-bold outline-none focus:border-red-500 transition-all text-sm shadow-inner leading-relaxed" placeholder="Hoş geldiniz metni veya sistem rehberini buraya yazabilirsiniz..." />
+                      </div>
+                    </div>
+                  </div>
 
-
-             {weekNumber === 1 && (
-  <div className="space-y-10 animate-in fade-in slide-in-from-top-4 duration-500">
-    {/* 1. KISIM: ORYANTASYON VİDEOSU VE METNİ */}
-    <div className="p-6 md:p-8 bg-gradient-to-br from-red-50 to-white rounded-3xl border-2 border-[#ce1212]/20 shadow-sm space-y-6 text-left leading-normal">
-      <div className="flex items-center gap-3 text-[#ce1212] border-b border-red-100 pb-4 leading-none">
-        <ShieldCheck size={24} />
-        <div className="text-left leading-none">
-          <h3 className="font-black uppercase text-[10px] md:text-xs tracking-widest leading-none">SİSTEM GENELİ ORYANTASYON VİDEOSU</h3>
-          <p className="text-[9px] text-gray-400 font-bold mt-2 uppercase tracking-tighter">* Sisteme girişte izlenmesi zorunlu olan rehber içeriktir.</p>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 leading-none">
-        <div className="text-left">
-          <label className="flex items-center gap-2 text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest"><Type size={12} /> Oryantasyon Başlığı</label>
-          <input type="text" value={introTitle} onChange={(e) => setIntroTitle(e.target.value)} className="w-full p-3.5 rounded-xl border border-gray-200 text-xs font-bold outline-none focus:border-red-500 bg-white" />
-        </div>
-        <div className="text-left">
-          <label className="flex items-center gap-2 text-[9px] font-black text-gray-400 uppercase mb-2 tracking-widest"><PlayCircle size={12} /> Video Embed URL</label>
-          <input type="url" value={introVideoUrl} onChange={(e) => setIntroVideoUrl(e.target.value)} className="w-full p-3.5 rounded-xl border border-gray-200 text-xs font-mono outline-none focus:border-red-500 bg-white" />
-        </div>
-        <div className="md:col-span-2 text-left mt-4">
-          <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest">Oryantasyon Metni (Opsiyonel)</label>
-          <textarea
-            value={introDescription}
-            onChange={(e) => setIntroDescription(e.target.value)}
-            rows={4}
-            className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-black font-bold outline-none focus:border-red-500 transition-all text-sm shadow-inner leading-relaxed"
-            placeholder="Hoş geldiniz metni veya sistem rehberini buraya yazabilirsiniz..."
-          />
-        </div>
-      </div>
-    </div>
-
-    {/* 2. KISIM: ÖN DEĞERLENDİRME TESTİ DÜZENLEYİCİ */}
-    <div className="p-6 md:p-8 bg-gradient-to-br from-blue-50 to-white rounded-3xl border-2 border-blue-200 shadow-sm space-y-6 text-left leading-normal">
-      <div className="flex items-center justify-between border-b border-blue-100 pb-4">
-        <div className="flex items-center gap-3 text-blue-600 leading-none">
-          <ListChecks size={24} />
-          <div>
-            <h3 className="font-black uppercase text-[10px] md:text-xs tracking-widest leading-none">ÖN DEĞERLENDİRME TESTİ (ZORUNLU)</h3>
-            <p className="text-[9px] text-gray-400 font-bold mt-2 uppercase tracking-tighter">* Öğrenciler bu testi tamamlamadan haftalık derslere erişemezler.</p>
-          </div>
-        </div>
-        <button 
-          type="button" 
-          onClick={() => setPreTestQuestions([...preTestQuestions, { question_text: "", options: [{option_text: "", is_correct: true}, {option_text: "", is_correct: false}, {option_text: "", is_correct: false}, {option_text: "", is_correct: false}, {option_text: "", is_correct: false}] }])}
-          className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black hover:bg-blue-700 transition-all shadow-lg active:scale-95"
-        >
-          + YENİ SORU EKLE
-        </button>
-      </div>
-
-      <div className="space-y-8">
-        {preTestQuestions.map((q, qIndex) => (
-          <div key={qIndex} className="p-5 md:p-7 bg-white rounded-[2rem] border border-blue-100 shadow-sm space-y-5 relative group">
-            <button 
-              type="button" 
-              onClick={() => setPreTestQuestions(preTestQuestions.filter((_, i) => i !== qIndex))} 
-              className="absolute top-6 right-6 text-gray-300 hover:text-red-500 transition-colors"
-            >
-              <Trash2 size={20} />
-            </button>
-
-            <div className="flex gap-4 items-start pr-10">
-              <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center font-black shrink-0 shadow-blue-200 shadow-lg text-sm">{qIndex + 1}</span>
-              <div className="w-full">
-                <label className="block text-[9px] font-black text-gray-400 uppercase mb-1 tracking-widest">Soru Metni</label>
-                <input 
-                  type="text" 
-                  placeholder="Örn: Yapay zekanın temel amacı nedir?" 
-                  className="w-full p-2 border-b-2 border-gray-50 focus:border-blue-500 outline-none font-bold text-sm bg-transparent"
-                  value={q.question_text}
-                  onChange={(e) => {
-                    const newQs = [...preTestQuestions];
-                    newQs[qIndex].question_text = e.target.value;
-                    setPreTestQuestions(newQs);
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pl-12">
-              {q.options.map((opt, oIndex) => (
-                <div key={oIndex} className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition-all ${opt.is_correct ? 'bg-green-50 border-green-500' : 'bg-gray-50 border-gray-100'}`}>
-                  <button 
-                    type="button" 
-                    onClick={() => {
-                      const newQs = [...preTestQuestions];
-                      newQs[qIndex].options.forEach((o, i) => o.is_correct = i === oIndex);
-                      setPreTestQuestions(newQs);
-                    }}
-                    className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${opt.is_correct ? 'bg-green-500 text-white shadow-green-200 shadow-lg' : 'bg-white text-gray-300 border'}`}
-                  >
-                    <Check size={14} />
-                  </button>
-                  <input 
-                    type="text" 
-                    placeholder={`${oIndex + 1}. Seçenek`}
-                    className="bg-transparent outline-none text-[11px] font-bold w-full text-secondary"
-                    value={opt.option_text}
-                    onChange={(e) => {
-                      const newQs = [...preTestQuestions];
-                      newQs[qIndex].options[oIndex].option_text = e.target.value;
-                      setPreTestQuestions(newQs);
-                    }}
-                  />
+                  <div className="p-6 md:p-8 bg-gradient-to-br from-blue-50 to-white rounded-3xl border-2 border-blue-200 shadow-sm space-y-6 text-left leading-normal">
+                    <div className="flex items-center justify-between border-b border-blue-100 pb-4">
+                      <div className="flex items-center gap-3 text-blue-600 leading-none">
+                        <ListChecks size={24} />
+                        <div>
+                          <h3 className="font-black uppercase text-[10px] md:text-xs tracking-widest leading-none">ÖN DEĞERLENDİRME TESTİ (ZORUNLU)</h3>
+                          <p className="text-[9px] text-gray-400 font-bold mt-2 uppercase tracking-tighter">* Öğrenciler bu testi tamamlamadan haftalık derslere erişemezler.</p>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => setPreTestQuestions([...preTestQuestions, { question_text: "", options: [{option_text: "", is_correct: true}, {option_text: "", is_correct: false}, {option_text: "", is_correct: false}, {option_text: "", is_correct: false}, {option_text: "", is_correct: false}] }])} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-[10px] font-black hover:bg-blue-700 transition-all shadow-lg active:scale-95">+ YENİ SORU EKLE</button>
+                    </div>
+                    <div className="space-y-8">
+                      {preTestQuestions.map((q, qIndex) => (
+                        <div key={qIndex} className="p-5 md:p-7 bg-white rounded-[2rem] border border-blue-100 shadow-sm space-y-5 relative group">
+                          <button type="button" onClick={() => setPreTestQuestions(preTestQuestions.filter((_, i) => i !== qIndex))} className="absolute top-6 right-6 text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={20} /></button>
+                          <div className="flex gap-4 items-start pr-10">
+                            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center font-black shrink-0 shadow-lg text-sm">{qIndex + 1}</span>
+                            <div className="w-full">
+                              <label className="block text-[9px] font-black text-gray-400 uppercase mb-1 tracking-widest">Soru Metni</label>
+                              <input type="text" placeholder="Soru metni..." className="w-full p-2 border-b-2 border-gray-50 focus:border-blue-500 outline-none font-bold text-sm bg-transparent" value={q.question_text} onChange={(e) => { const newQs = [...preTestQuestions]; newQs[qIndex].question_text = e.target.value; setPreTestQuestions(newQs); }} />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pl-12">
+                            {q.options.map((opt, oIndex) => (
+                              <div key={oIndex} className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition-all ${opt.is_correct ? 'bg-green-50 border-green-500' : 'bg-gray-50 border-gray-100'}`}>
+                                <button type="button" onClick={() => { const newQs = [...preTestQuestions]; newQs[qIndex].options.forEach((o, i) => o.is_correct = i === oIndex); setPreTestQuestions(newQs); }} className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${opt.is_correct ? 'bg-green-500 text-white shadow-lg' : 'bg-white text-gray-300 border'}`}><Check size={14} /></button>
+                                <input type="text" placeholder={`${oIndex + 1}. Seçenek`} className="bg-transparent outline-none text-[11px] font-bold w-full text-secondary" value={opt.option_text} onChange={(e) => { const newQs = [...preTestQuestions]; newQs[qIndex].options[oIndex].option_text = e.target.value; setPreTestQuestions(newQs); }} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  </div>
-)}
+              )}
 
-              <div className="space-y-6 text-left leading-normal text-left text-left text-left">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-100 pb-4 gap-4 leading-none text-left">
-                  <h3 className="font-black text-secondary uppercase text-[10px] md:text-xs tracking-widest flex items-center gap-2 text-left leading-none text-left text-left text-left"><ListChecks size={18} className="text-[#ce1212] text-left" /> Materyaller ve Puanlama</h3>
-                  <button type="button" onClick={addMaterialRow} className="w-full sm:w-auto bg-red-50 text-[#ce1212] flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-[10px] font-black hover:bg-[#ce1212] hover:text-white transition-all shadow-sm leading-none text-left"><Plus size={16} className="text-left" /> MATERYAL EKLE</button>
+              <div className="space-y-6 text-left leading-normal mt-10">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-100 pb-4 gap-4 leading-none">
+                  <h3 className="font-black text-secondary uppercase text-[10px] md:text-xs tracking-widest flex items-center gap-2"><ListChecks size={18} className="text-[#ce1212]" /> Materyaller ve Puanlama</h3>
+                  <button type="button" onClick={addMaterialRow} className="w-full sm:w-auto bg-red-50 text-[#ce1212] flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-[10px] font-black hover:bg-[#ce1212] hover:text-white transition-all shadow-sm"><Plus size={16} /> MATERYAL EKLE</button>
                 </div>
-                <div className="grid gap-6 text-left">
+                <div className="grid gap-6">
                   {materials.map((mat, mIndex) => (
-                    <div key={mIndex} className="p-4 md:p-6 bg-gray-50 rounded-2xl md:rounded-[2.5rem] border border-gray-200 space-y-4 hover:border-red-200 transition-all group leading-normal text-left">
-                      <div className="flex flex-col lg:flex-row gap-4 items-center leading-none text-left text-left text-left text-left">
-                        <div className="w-full lg:w-32 shrink-0 leading-none text-left">
-                          <select value={mat.content_type} onChange={(e) => updateMaterial(mIndex, 'content_type', e.target.value)} className="w-full p-3 rounded-xl border border-gray-200 text-black text-[9px] font-black bg-white outline-none shadow-sm leading-none text-left cursor-pointer">
+                    <div key={mIndex} className="p-4 md:p-6 bg-gray-50 rounded-2xl md:rounded-[2.5rem] border border-gray-200 space-y-4 hover:border-red-200 transition-all group leading-normal">
+                      <div className="flex flex-col lg:flex-row gap-4 items-center">
+                        <div className="w-full lg:w-32 shrink-0">
+                          <select value={mat.content_type} onChange={(e) => updateMaterial(mIndex, 'content_type', e.target.value)} className="w-full p-3 rounded-xl border border-gray-200 text-black text-[9px] font-black bg-white outline-none shadow-sm cursor-pointer leading-none">
                             <option value="video">🎥 Video</option>
                             <option value="podcast">🎙️ Podcast</option>
                             <option value="form">📝 Test</option>
                             <option value="pdf">📄 PDF</option>
-                            <option value="assignment">📂 Ödev (MS Form)</option> {/* BURAYI EKLE */}
+                            <option value="assignment">📂 Ödev (MS Form)</option>
                           </select>
                         </div>
-                        <div className="w-full flex-1 leading-none text-left">
-                          <input type="text" placeholder="Materyal Başlığı" className="w-full p-3 rounded-xl border border-gray-200 text-black text-xs font-bold outline-none bg-white shadow-sm leading-none text-left" value={mat.title} onChange={(e) => updateMaterial(mIndex, 'title', e.target.value)} />
+                        <div className="w-full flex-1">
+                          <input type="text" placeholder="Materyal Başlığı" className="w-full p-3 rounded-xl border border-gray-200 text-black text-xs font-bold outline-none bg-white shadow-sm leading-none" value={mat.title} onChange={(e) => updateMaterial(mIndex, 'title', e.target.value)} />
                         </div>
-
                         {mat.content_type !== 'pdf' && (
-                          <div className="w-full lg:w-28 shrink-0 flex items-center gap-2 bg-white p-1 rounded-xl border border-gray-100 shadow-sm text-left">
-                            <Award size={14} className="text-amber-500 ml-1 text-left" />
-                            <input type="number" placeholder="Puan" className="w-full p-2 text-xs font-black text-secondary outline-none leading-none bg-transparent text-left" value={mat.point_value} onChange={(e) => updateMaterial(mIndex, 'point_value', e.target.value)} />
+                          <div className="w-full lg:w-28 shrink-0 flex items-center gap-2 bg-white p-1 rounded-xl border border-gray-100 shadow-sm">
+                            <Award size={14} className="text-amber-500 ml-1" />
+                            <input type="number" placeholder="Puan" className="w-full p-2 text-xs font-black text-secondary outline-none bg-transparent leading-none" value={mat.point_value} onChange={(e) => updateMaterial(mIndex, 'point_value', e.target.value)} />
                           </div>
                         )}
-
-                        {/* SADECE TEST DEĞİLSE URL INPUTU GÖSTER */}
                         {mat.content_type !== 'form' && (
-                          <div className="w-full flex-[1.5] leading-none text-left">
-                            <input type="url" placeholder={mat.content_type === 'pdf' ? "OneDrive İndirme Linki" : "Embed URL Adresi"} className="w-full p-3 rounded-xl border border-gray-200 text-black text-[10px] font-mono outline-none bg-white shadow-sm leading-none text-left" value={mat.embed_url} onChange={(e) => updateMaterial(mIndex, 'embed_url', e.target.value)} />
+                          <div className="w-full flex-[1.5]">
+                            <input type="url" placeholder={mat.content_type === 'pdf' ? "OneDrive İndirme Linki" : "Embed URL Adresi"} className="w-full p-3 rounded-xl border border-gray-200 text-black text-[10px] font-mono outline-none bg-white shadow-sm leading-none" value={mat.embed_url} onChange={(e) => updateMaterial(mIndex, 'embed_url', e.target.value)} />
                           </div>
                         )}
-
-                        <button type="button" onClick={() => removeMaterialRow(mIndex)} className="w-full lg:w-auto p-3 text-red-400 hover:text-red-600 transition-colors leading-none active:scale-90 text-left"><Trash2 size={20} className="text-left" /></button>
+                        <button type="button" onClick={() => removeMaterialRow(mIndex)} className="w-full lg:w-auto p-3 text-red-400 hover:text-red-600 transition-colors active:scale-90"><Trash2 size={20} /></button>
                       </div>
 
                       {mat.content_type === 'form' && mat.quiz && (
-                        <div className="mt-4 bg-white p-5 rounded-2xl border-2 border-dashed border-red-100 space-y-6 text-left leading-normal text-left">
-                          <div className="flex items-center justify-between border-b border-gray-50 pb-3 text-left">
-                            <div className="flex items-center gap-2 text-[#ce1212] font-black text-[10px] uppercase tracking-widest text-left"><ListChecks size={18} /> Sınav Düzenleyici</div>
+                        <div className="mt-4 bg-white p-5 rounded-2xl border-2 border-dashed border-red-100 space-y-6 text-left">
+                          <div className="flex items-center justify-between border-b border-gray-50 pb-3">
+                            <div className="flex items-center gap-2 text-[#ce1212] font-black text-[10px] uppercase tracking-widest"><ListChecks size={18} /> Sınav Düzenleyici</div>
                             <button type="button" onClick={() => addQuestion(mIndex)} className="text-[#ce1212] font-black text-[9px] uppercase hover:underline">+ Yeni Soru Ekle</button>
                           </div>
-                          <div className="space-y-8 text-left">
+                          <div className="space-y-8">
                             {mat.quiz.questions.map((q, qIndex) => (
-                              <div key={qIndex} className="p-4 bg-gray-50/50 rounded-xl space-y-4 border border-gray-100 text-left">
-                                <div className="flex gap-4 items-start text-left">
+                              <div key={qIndex} className="p-4 bg-gray-50/50 rounded-xl space-y-4 border border-gray-100">
+                                <div className="flex gap-4 items-start">
                                   <span className="bg-[#ce1212] text-white w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 shadow-md">{qIndex + 1}</span>
-                                  <input type="text" placeholder="Soru metni..." className="w-full p-2.5 rounded-lg border text-xs font-bold focus:border-red-500 outline-none shadow-sm" value={q.question_text} onChange={(e) => updateQuestionText(mIndex, qIndex, e.target.value)} />
+                                  <input type="text" placeholder="Soru metni..." className="w-full p-2.5 rounded-lg border text-xs font-bold focus:border-red-500 outline-none" value={q.question_text} onChange={(e) => updateQuestionText(mIndex, qIndex, e.target.value)} />
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:pl-11 text-left">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:pl-11">
                                   {q.options.map((opt, oIndex) => (
                                     <div key={oIndex} className={`flex items-center gap-3 p-2 rounded-xl border transition-all ${opt.is_correct ? 'bg-green-50 border-green-500' : 'bg-white border-gray-100'}`}>
-                                      <button type="button" onClick={() => setCorrectOption(mIndex, qIndex, oIndex)} className={`w-5 h-5 rounded flex items-center justify-center shrink-0 shadow-sm ${opt.is_correct ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-300'}`}><Check size={12} /></button>
+                                      <button type="button" onClick={() => setCorrectOption(mIndex, qIndex, oIndex)} className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${opt.is_correct ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-300'}`}><Check size={12} /></button>
                                       <input type="text" placeholder="Şık içeriği..." className="flex-1 bg-transparent text-[10px] font-bold outline-none" value={opt.option_text} onChange={(e) => updateOption(mIndex, qIndex, oIndex, e.target.value)} />
                                     </div>
                                   ))}
@@ -946,117 +916,80 @@ const handlePrintChatbot = () => {
                 </div>
               </div>
 
-              <div className="mt-12 space-y-6 text-left leading-normal text-left">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-100 pb-4 gap-4 leading-none text-left">
-                  <div className="flex items-center gap-2 text-secondary font-black text-[10px] md:text-xs uppercase tracking-widest leading-none text-left"><BookOpen size={18} className="text-blue-600" /> Haftalık Flashcardlar</div>
-                  <button type="button" onClick={() => setFlashcards([...flashcards, { question: '', answer: '' }])} className="w-full sm:w-auto bg-blue-50 text-blue-600 flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-[10px] font-black hover:bg-blue-600 hover:text-white transition-all shadow-sm leading-none text-left"><Plus size={16} /> KART EKLE</button>
+              <div className="mt-12 space-y-6 text-left leading-normal">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-gray-100 pb-4 gap-4 leading-none">
+                  <div className="flex items-center gap-2 text-secondary font-black text-[10px] md:text-xs uppercase tracking-widest leading-none"><BookOpen size={18} className="text-blue-600" /> Haftalık Flashcardlar</div>
+                  <button type="button" onClick={() => setFlashcards([...flashcards, { question: '', answer: '' }])} className="w-full sm:w-auto bg-blue-50 text-blue-600 flex items-center justify-center gap-2 px-5 py-2.5 rounded-full text-[10px] font-black hover:bg-blue-600 hover:text-white transition-all shadow-sm leading-none"><Plus size={16} /> KART EKLE</button>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 text-left leading-normal">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                   {flashcards.map((card, idx) => (
                     <div key={idx} className="p-5 md:p-6 bg-blue-50/30 rounded-2xl border-2 border-blue-100 space-y-4 relative group hover:border-blue-300 transition-all shadow-sm">
-                      <button
-                        type="button"
-                        onClick={() => setFlashcards(flashcards.filter((_, i) => i !== idx))}
-                        className="absolute top-4 right-4 p-2 text-gray-300 hover:text-red-600 transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-
+                      <button type="button" onClick={() => setFlashcards(flashcards.filter((_, i) => i !== idx))} className="absolute top-4 right-4 p-2 text-gray-300 hover:text-red-600 transition-colors"><Trash2 size={16} /></button>
                       <div className="space-y-4">
-                        {/* KAYNAK BAŞLIĞI (Eski Question) */}
                         <div>
-                          <label className="block text-[9px] font-black text-blue-600 uppercase mb-1.5 tracking-widest">
-                            <Type size={10} className="inline mr-1" /> Kaynak / Döküman Adı
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Örn: Haftalık Özet Notları"
-                            className="w-full p-3 rounded-xl border border-blue-100 text-xs font-bold outline-none focus:border-blue-500 bg-white"
-                            value={card.question}
-                            onChange={(e) => updateFlashcard(idx, 'question', e.target.value)}
-                          />
+                          <label className="block text-[9px] font-black text-blue-600 uppercase mb-1.5 tracking-widest"><Type size={10} className="inline mr-1" /> Kaynak / Döküman Adı</label>
+                          <input type="text" placeholder="Kaynak adı..." className="w-full p-3 rounded-xl border border-blue-100 text-xs font-bold outline-none focus:border-blue-500 bg-white" value={card.question} onChange={(e) => updateFlashcard(idx, 'question', e.target.value)} />
                         </div>
-
-                        {/* ONEDRIVE LINKI (Eski Answer) */}
                         <div>
-                          <label className="block text-[9px] font-black text-blue-600 uppercase mb-1.5 tracking-widest">
-                            <Download size={10} className="inline mr-1" /> OneDrive / Word / PDF Linki
-                          </label>
-                          <input
-                            type="url"
-                            placeholder="https://bingol-my.sharepoint.com/..."
-                            className="w-full p-3 rounded-xl border border-blue-100 text-[10px] font-mono outline-none focus:border-blue-500 bg-white"
-                            value={card.answer}
-                            onChange={(e) => updateFlashcard(idx, 'answer', e.target.value)}
-                          />
+                          <label className="block text-[9px] font-black text-blue-600 uppercase mb-1.5 tracking-widest"><Download size={10} className="inline mr-1" /> OneDrive / Word / PDF Linki</label>
+                          <input type="url" placeholder="Link..." className="w-full p-3 rounded-xl border border-blue-100 text-[10px] font-mono outline-none focus:border-blue-500 bg-white" value={card.answer} onChange={(e) => updateFlashcard(idx, 'answer', e.target.value)} />
                         </div>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="mb-10 p-6 md:p-8 bg-amber-50/30 rounded-3xl border-2 border-amber-100 shadow-sm space-y-6 text-left leading-normal text-left">
-                <div className="flex items-center gap-3 text-amber-600 border-b border-amber-100 pb-4 leading-none text-left">
-                  <Calendar size={24} className="text-left" />
-                  <div className="text-left leading-none text-left">
-                    <h3 className="font-black uppercase text-[10px] md:text-xs tracking-widest leading-none text-left uppercase text-left">HAFTALIK DERS NOTLARI VE ÖZET</h3>
-                    <p className="text-[9px] text-gray-400 font-bold mt-2 uppercase tracking-tighter text-left leading-none">* Öğrencilerin panelinde görüntülenecek olan haftalık akademik içerik.</p>
+
+              <div className="mt-10 p-6 md:p-8 bg-amber-50/30 rounded-3xl border-2 border-amber-100 shadow-sm space-y-6">
+                <div className="flex items-center gap-3 text-amber-600 border-b border-amber-100 pb-4 leading-none">
+                  <Calendar size={24} />
+                  <div className="text-left leading-none">
+                    <h3 className="font-black uppercase text-[10px] md:text-xs tracking-widest leading-none">HAFTALIK DERS NOTLARI VE ÖZET</h3>
+                    <p className="text-[9px] text-gray-400 font-bold mt-2 uppercase tracking-tighter">* Öğrencilerin panelinde görüntülenecek içerik.</p>
                   </div>
                 </div>
-                <textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-5 md:p-8 rounded-2xl border-2 border-gray-100 bg-white text-black outline-none focus:border-amber-500 transition-all font-bold text-sm shadow-inner leading-relaxed text-left" placeholder="Ders notlarını, formülleri veya önemli hatırlatmaları buraya yazabilirsiniz..." />
+                <textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-5 md:p-8 rounded-2xl border-2 border-gray-100 bg-white text-black outline-none focus:border-amber-500 transition-all font-bold text-sm shadow-inner leading-relaxed" placeholder="Ders notlarını buraya yazabilirsiniz..." />
               </div>
-              <button type="submit" disabled={loading} className="w-full mt-10 bg-[#1a1a1a] text-white py-6 rounded-[2rem] font-black tracking-[0.2em] hover:bg-black transition-all flex justify-center items-center gap-3 shadow-2xl active:scale-95 text-xs md:text-sm uppercase leading-none"><Save size={20} className="text-[#ce1212]" /> {loading ? "KAYDEDİLİYOR..." : "HAFTAYI KAYDET VE YAYINLA"}</button>
+              
+              <button type="submit" disabled={loading} className="w-full mt-10 bg-[#1a1a1a] text-white py-6 rounded-[2rem] font-black tracking-[0.2em] hover:bg-black transition-all flex justify-center items-center gap-3 shadow-2xl active:scale-95 text-xs md:text-sm uppercase leading-none">
+                <Save size={20} className="text-[#ce1212]" /> {loading ? "KAYDEDİLİYOR..." : "HAFTAYI KAYDET VE YAYINLA"}
+              </button>
             </div>
           </form>
-        ) : (
-          <div className="animate-in slide-in-from-bottom-4 duration-500 space-y-6 md:space-y-8 pb-10 text-left leading-normal text-left">
+        )}
+
+        {/* --- SEKME 2: ÖĞRENCİ ANALİZLERİ --- */}
+        {activeTab === 'analytics' && (
+          <div className="animate-in slide-in-from-bottom-4 duration-500 space-y-6 md:space-y-8 pb-10 text-left">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-left">
-              <div className="flex items-center gap-6 leading-none text-left text-left">
-                <div className="bg-blue-50 p-4 rounded-2xl text-blue-600 flex items-center justify-center leading-none text-left"><Users size={32} className="text-left" /></div>
-                <div className="text-left leading-none text-left text-left"><p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-2 leading-none text-left">Kayıtlı Öğrenci</p><p className="text-3xl font-black text-left">{filteredAnalytics.length}</p></div>
+              <div className="flex items-center gap-6 leading-none">
+                <div className="bg-blue-50 p-4 rounded-2xl text-blue-600 flex items-center justify-center leading-none"><Users size={32} /></div>
+                <div className="text-left leading-none">
+                  <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-2 leading-none">Kayıtlı Öğrenci</p>
+                  <p className="text-3xl font-black">{filteredAnalytics.length}</p>
+                </div>
               </div>
               <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto leading-none text-left">
-                <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-xl border border-gray-200 text-left text-left">
-                  <Filter size={16} className="text-gray-400 text-left" />
-                  <select 
-  value={selectedDepartment} 
-  onChange={(e) => setSelectedDepartment(e.target.value)} 
-  className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer text-left"
->
-  {/* 'all' seçeneği tamamen kaldırıldı */}
-  {departmentList.map(d => (
-    <option key={d.id} value={d.id} className="text-left">
-      {d.name}
-    </option>
-  ))}
-</select>
+                <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-xl border border-gray-200 text-left">
+                  <Filter size={16} className="text-gray-400" />
+                  <select value={selectedDepartment} onChange={(e) => setSelectedDepartment(e.target.value)} className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer">
+                    {departmentList.map(d => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </select>
                 </div>
-                {/* PDF RAPOR BUTONU DÜZENLEMESİ */}
-                {/* AKADEMİK RAPOR BUTONU */}
-  <button
-    onClick={handlePrintAcademic}
-    className="flex items-center justify-center gap-3 bg-red-700 hover:bg-red-800 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all leading-none active:scale-95 text-left"
-  >
-    <FileText size={18} /> {getDeptName(selectedDepartment).toUpperCase()} AKADEMİK RAPOR
-  </button>
-
-  {/* CHATBOT RAPOR BUTONU */}
-  <button
-    onClick={handlePrintChatbot}
-    className="flex items-center justify-center gap-3 bg-blue-900 hover:bg-blue-950 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all leading-none active:scale-95 text-left"
-  >
-    <Bot size={18} /> {getDeptName(selectedDepartment).toUpperCase()} CHATBOT ANALİZİ
-  </button>
+                <button onClick={handlePrintAcademic} className="flex items-center justify-center gap-3 bg-red-700 hover:bg-red-800 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all leading-none active:scale-95">
+                  <FileText size={18} /> {getDeptName(selectedDepartment).toUpperCase()} AKADEMİK RAPOR
+                </button>
+               
               </div>
             </div>
 
-            <div className="bg-white rounded-3xl md:rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden text-left leading-normal">
+            <div className="bg-white rounded-3xl md:rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden text-left">
               <div className="p-6 md:p-8 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <BarChart3 size={18} className="text-[#ce1212]" />
-                  <h2 className="font-black text-secondary uppercase text-[10px] md:text-xs tracking-widest">
-                    Akademik Takip Çizelgesi
-                  </h2>
+                  <h2 className="font-black text-secondary uppercase text-[10px] md:text-xs tracking-widest">Akademik Takip Çizelgesi</h2>
                 </div>
               </div>
               <div className="overflow-x-auto custom-scrollbar">
@@ -1074,9 +1007,7 @@ const handlePrintChatbot = () => {
                       <tr key={student.id} className="hover:bg-gray-50/50 transition-all group">
                         <td className="p-5 md:p-8">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-secondary text-white rounded-full flex items-center justify-center font-bold text-xs shadow-md shrink-0 ring-4 ring-gray-50 uppercase">
-                              {student.first_name[0]}{student.last_name[0]}
-                            </div>
+                            <div className="w-10 h-10 bg-secondary text-white rounded-full flex items-center justify-center font-bold text-xs shadow-md shrink-0 uppercase">{student.first_name[0]}{student.last_name[0]}</div>
                             <div className="min-w-0 flex-1 leading-tight">
                               <p className="font-black text-black text-sm truncate uppercase">{student.first_name} {student.last_name}</p>
                               <p className="text-[9px] text-[#ce1212] font-black mt-1 uppercase">{getDeptName(student.department)}</p>
@@ -1085,38 +1016,25 @@ const handlePrintChatbot = () => {
                         </td>
                         <td className="p-5 md:p-8">
                           <div className="flex items-center gap-4">
-                            <div className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg font-black text-[10px] border border-amber-200 shrink-0 shadow-sm">
-                              {student.total_points} Puan
-                            </div>
+                            <div className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg font-black text-[10px] border border-amber-200 shadow-sm">{student.total_points} Puan</div>
                             <div className="space-y-1.5 w-32">
                               <div className="flex justify-between items-center leading-none">
-                                {/* EN SON YÜZDELİK VE TUR BİLGİSİ */}
-                                <span className="text-[10px] font-bold text-secondary">
-                                  %{student.overall_progress}
-                                </span>
-                                {/* Eğer öğrenci herhangi bir haftada 2. tura geçtiyse bir uyarı ikonu eklenebilir */}
+                                <span className="text-[10px] font-bold text-secondary">%{student.overall_progress}</span>
                                 <span className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">GÜNCEL</span>
                               </div>
                               <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden border shadow-inner">
-                                <div
-                                  className={`h-full transition-all duration-1000 ${student.overall_progress === 100 ? 'bg-green-500' : 'bg-[#ce1212]'}`}
-                                  style={{ width: `${student.overall_progress}%` }}
-                                />
+                                <div className={`h-full transition-all duration-1000 ${student.overall_progress === 100 ? 'bg-green-500' : 'bg-[#ce1212]'}`} style={{ width: `${student.overall_progress}%` }} />
                               </div>
                             </div>
                           </div>
                         </td>
                         <td className="p-5 md:p-8">
                           <div className="flex items-center gap-2 text-gray-700 font-black text-xs md:text-sm">
-                            <Clock size={16} className="text-amber-500 shrink-0" />
-                            {formatDuration(student.total_time_spent)}
+                            <Clock size={16} className="text-amber-500 shrink-0" /> {formatDuration(student.total_time_spent)}
                           </div>
                         </td>
                         <td className="p-5 md:p-8 text-center">
-                          <button
-                            onClick={() => setSelectedStudent(student)}
-                            className="inline-flex items-center gap-2 text-[9px] font-black uppercase bg-secondary text-white px-5 py-2.5 rounded-xl hover:bg-black transition-all active:scale-95 shadow-md"
-                          >
+                          <button onClick={() => setSelectedStudent(student)} className="inline-flex items-center gap-2 text-[9px] font-black uppercase bg-secondary text-white px-5 py-2.5 rounded-xl hover:bg-black transition-all active:scale-95 shadow-md">
                             <Search size={14} /> HAFTALIK KARNE
                           </button>
                         </td>
@@ -1128,6 +1046,118 @@ const handlePrintChatbot = () => {
             </div>
           </div>
         )}
+
+       {/* --- SEKME 3: CHATBOT ANALİZİ --- */}
+{activeTab === 'chatbot' && (
+  <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+    
+    {/* ÜST KONTROL VE FİLTRELEME ÇUBUĞU */}
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-left">
+      <div className="text-left leading-none">
+        <h2 className="text-xl font-black text-[#1a1a1a] uppercase leading-none border-l-4 border-[#ce1212] pl-3">Chatbot Etkileşim İzleme</h2>
+        <p className="text-[10px] text-gray-400 font-bold uppercase mt-2 tracking-widest italic leading-none">Soru Analizi ve Merak Endeksi</p>
+      </div>
+      <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto leading-none text-left">
+        <div className="flex items-center gap-2 bg-gray-50 px-4 py-2 rounded-xl border border-gray-200 text-left shadow-inner">
+          <Filter size={16} className="text-[#ce1212]" />
+          <select 
+            value={selectedDepartment} 
+            onChange={(e) => setSelectedDepartment(e.target.value)} 
+            className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer text-[#1a1a1a]"
+          >
+            {departmentList.map(d => (
+              <option key={d.id} value={d.id} className="text-black">{d.name}</option>
+            ))}
+          </select>
+        </div>
+        <button 
+          onClick={handlePrintChatbot}
+          className="flex items-center justify-center gap-3 bg-[#ce1212] hover:bg-black text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all leading-none active:scale-95 text-left"
+        >
+          <Bot size={18} /> {getDeptName(selectedDepartment).toUpperCase()} CHATBOT RAPORU AL
+        </button>
+      </div>
+    </div>
+
+    {/* ÖZET İSTATİSTİK KARTLARI */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="bg-white p-6 rounded-3xl shadow-xl border-b-4 border-[#ce1212] flex items-center gap-4">
+        <div className="bg-red-50 p-4 rounded-2xl text-[#ce1212] leading-none flex items-center justify-center">
+          <MessageSquare size={32} />
+        </div>
+        <div className="text-left leading-none">
+          <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest leading-none mb-2">Toplam Soru</p>
+          <p className="text-3xl font-black text-[#1a1a1a] leading-none">{chatbotData.reduce((acc, curr) => acc + curr.total_count, 0)}</p>
+        </div>
+      </div>
+      <div className="bg-[#1a1a1a] p-6 rounded-3xl shadow-xl flex items-center gap-4 text-white">
+        <div className="bg-white/10 p-4 rounded-2xl text-white leading-none flex items-center justify-center">
+          <Users size={32} />
+        </div>
+        <div className="text-left leading-none">
+          <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest leading-none mb-2">Aktif Kullanıcı</p>
+          <p className="text-3xl font-black leading-none text-white">{chatbotData.filter(d => d.total_count > 0).length} <span className="text-sm text-gray-500">/ {chatbotData.length}</span></p>
+        </div>
+      </div>
+    </div>
+
+    {/* DETAYLI ÖĞRENCİ LİSTESİ VE SORU GEÇMİŞİ */}
+    <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden text-left leading-normal">
+      <div className="p-6 border-b bg-gray-50/50 flex justify-between items-center">
+        <h2 className="font-black text-secondary uppercase text-xs tracking-widest flex items-center gap-2 leading-none">
+          <Bot size={18} className="text-[#ce1212]" /> Öğrenci Soru Geçmişi Detayları
+        </h2>
+      </div>
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className="w-full text-left border-collapse min-w-[800px]">
+          <thead className="bg-[#1a1a1a] text-white text-[10px] font-black uppercase tracking-widest leading-none">
+            <tr>
+              <th className="p-6 w-1/4">ÖĞRENCİ BİLGİSİ</th>
+              <th className="p-6 w-24 text-center">ADET</th>
+              <th className="p-6">SORDUĞU SORULAR VE HAFTA ANALİZİ</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {chatbotData.map((student, i) => (
+              <tr key={i} className="hover:bg-red-50/30 transition-all align-top">
+                <td className="p-6">
+                  <p className="font-black text-black uppercase text-sm leading-none">{student.student_name}</p>
+                  <p className="text-[8px] text-[#ce1212] font-black uppercase mt-2 tracking-tighter leading-none">
+                    {getDeptName(selectedDepartment)}
+                  </p>
+                </td>
+                <td className="p-6 text-center">
+                  <span className="bg-[#1a1a1a] text-white px-4 py-2 rounded-xl font-black text-sm shadow-md inline-block leading-none">
+                    {student.total_count}
+                  </span>
+                </td>
+                <td className="p-6">
+                  <div className="flex flex-col gap-3 max-h-64 overflow-y-auto pr-3 custom-scrollbar">
+                    {student.questions.length > 0 ? (
+                      student.questions.map((q, qi) => (
+                        <div key={qi} className="bg-white p-3 rounded-2xl border border-gray-100 hover:border-red-200 transition-colors shadow-sm">
+                          <div className="flex justify-between text-[8px] font-black text-gray-400 uppercase mb-2 tracking-tighter leading-none">
+                            <span className="flex items-center gap-1"><Calendar size={10} className="text-[#ce1212]" /> {q.date}</span>
+                            <span className="bg-[#ce1212] px-2 py-0.5 rounded-full text-white font-black">HAFTA {q.week}</span>
+                          </div>
+                          <p className="text-[11px] text-gray-700 font-medium italic leading-relaxed">&quot;{q.text}&quot;</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="py-6 text-center">
+                        <span className="text-gray-300 italic text-[10px] uppercase font-bold tracking-widest">Henüz bir chatbot etkileşimi bulunmuyor.</span>
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+)}
       </main>
 
       {/* KARNE MODALI - SADECE AI SORULARI VE TEST SONUÇLARI */}
