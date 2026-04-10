@@ -70,6 +70,18 @@ interface Material {
   point_value?: number;
   quiz?: Quiz;
 }
+interface EntryOption {
+  id?: number;
+  option_text: string;
+  is_correct: boolean;
+}
+
+interface EntryQuestion {
+  id?: number;
+  question_text: string;
+  target_week: number; // Yanlış yapılırsa açılacak hafta no
+  options: EntryOption[];
+}
 
 interface QuizDetailAnalysis {
   question_text: string;
@@ -182,6 +194,7 @@ export default function TeacherDashboard() {
   const [materials, setMaterials] = useState<Material[]>([{ content_type: 'video', embed_url: '', title: '', point_value: 10 }]);
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [chatbotData, setChatbotData] = useState<ChatbotReportData[]>([]);
+  const [entryQuestions, setEntryQuestions] = useState<EntryQuestion[]>([]);
 
   // --- BÖLÜM LİSTESİ ---
   const departmentList = [
@@ -281,6 +294,7 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
 
       // Flashcardlar
       setFlashcards(data.flashcards || []);
+      setEntryQuestions(data.entry_questions || []);
 
       // --- KRİTİK GÜNCELLEME: ÖN TEST SORULARINI YÜKLE ---
       if (week === 1) {
@@ -470,6 +484,43 @@ const handlePrintChatbot = () => {
     setMaterials(newMaterials);
   };
 
+ const addEntryQuestion = () => {
+  setEntryQuestions([
+    ...entryQuestions,
+    {
+      question_text: "",
+      target_week: 1,
+      options: [
+        { option_text: "", is_correct: true },
+        { option_text: "", is_correct: false },
+        { option_text: "", is_correct: false },
+        { option_text: "", is_correct: false },
+        { option_text: "", is_correct: false }
+      ]
+    }
+  ]);
+};
+
+const updateEntryQuestion = (index: number, field: keyof EntryQuestion, value: any) => {
+  const newQs = [...entryQuestions];
+  newQs[index] = { ...newQs[index], [field]: value };
+  setEntryQuestions(newQs);
+};
+
+const updateEntryOption = (qIdx: number, oIdx: number, text: string) => {
+  const newQs = [...entryQuestions];
+  newQs[qIdx].options[oIdx].option_text = text;
+  setEntryQuestions(newQs);
+};
+
+const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
+  const newQs = [...entryQuestions];
+  newQs[qIdx].options.forEach((opt, i) => {
+    opt.is_correct = i === oIdx;
+  });
+  setEntryQuestions(newQs);
+};
+
   // --- SINAV (QUIZ) FONKSİYONLARI ---
   const addQuestion = (mIndex: number) => {
     const newMats = [...materials];
@@ -525,33 +576,100 @@ const handlePrintChatbot = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const payload = {
-        week_number: Number(weekNumber),
-        title,
-        description,
-        release_date: releaseDate || null,
-        intro_title: introTitle,
-        intro_video_url: introVideoUrl,
-        intro_description: introDescription,
-        materials,
-        flashcards: flashcards.map((f, index) => ({ ...f, order: index })),
-        pre_test_questions: weekNumber === 1 ? preTestQuestions : [], // Sadece 1. haftada gönder
+        const payload = {
+            week_number: Number(weekNumber),
+            title: title,
+            description: description,
+            release_date: releaseDate || null,
+            intro_title: introTitle,
+            intro_video_url: introVideoUrl,
+            intro_description: introDescription,
 
-      };
-      await api.post('/contents/list/', payload);
-      alert("Haftalık içerik başarıyla güncellendi.");
-      fetchWeekDetail(weekNumber);
+            // --- MATERYALLER (ID KORUMALI) ---
+            materials: materials
+                .filter(m => m.title.trim() !== "")
+                .map((m) => ({
+                    ...(m.id ? { id: m.id } : {}), // KRİTİK: ID varsa gönder, yoksa yeni oluşturur
+                    title: m.title,
+                    content_type: m.content_type,
+                    embed_url: m.embed_url,
+                    point_value: m.point_value,
+                    // Eğer materyal bir sınavsa (form) onun içindeki quiz ve soru ID'lerini de korumalıyız
+                    ...(m.quiz ? {
+                        quiz: {
+                            ...(m.quiz.id ? { id: m.quiz.id } : {}),
+                            title: m.quiz.title || m.title,
+                            description: m.quiz.description || "",
+                            questions: m.quiz.questions.map((q, qIdx) => ({
+                                ...(q.id ? { id: q.id } : {}),
+                                question_text: q.question_text,
+                                order: qIdx,
+                                options: q.options.map((opt) => ({
+                                    ...(opt.id ? { id: opt.id } : {}),
+                                    option_text: opt.option_text,
+                                    is_correct: opt.is_correct
+                                }))
+                            }))
+                        }
+                    } : {})
+                })),
+
+            // Kaynaklar (ID Korumalı)
+            flashcards: flashcards
+                .filter(f => f.question.trim() !== "")
+                .map((f, index) => ({ 
+                    ...(f.id ? { id: f.id } : {}), // ID Koruması
+                    question: f.question,
+                    answer: f.answer,
+                    order: index 
+                })),
+
+            // 1. HAFTA: Pre-Test (ID Korumalı)
+            pre_test_questions: Number(weekNumber) === 1 
+                ? preTestQuestions
+                    .filter(q => q.question_text.trim() !== "")
+                    .map((q, qIdx) => ({
+                        ...(q.id ? { id: q.id } : {}),
+                        question_text: q.question_text,
+                        order: qIdx,
+                        options: q.options.map(opt => ({
+                            ...(opt.id ? { id: opt.id } : {}),
+                            option_text: opt.option_text,
+                            is_correct: opt.is_correct
+                        }))
+                    }))
+                : [],
+
+            // Giriş Soruları (Zaten doğru yapmıştın ama üzerinden geçelim)
+            entry_questions: Number(weekNumber) > 1 
+                ? entryQuestions
+                    .filter(q => q.question_text.trim() !== "")
+                    .map((q, index) => ({
+                        ...(q.id ? { id: q.id } : {}),
+                        question_text: q.question_text,
+                        order: index,
+                        target_week: q.target_week, 
+                        options: q.options.map(opt => ({
+                            ...(opt.id ? { id: opt.id } : {}),
+                            option_text: opt.option_text,
+                            is_correct: opt.is_correct
+                        }))
+                    })) 
+                : [],
+        };
+
+        await api.post('/contents/list/', payload);
+        alert("Haftalık içerik başarıyla güncellendi.");
+        fetchWeekDetail(weekNumber);
     } catch (err) {
-      const error = err as AxiosError<{ detail?: string }>;
-      alert(error.response?.data?.detail || "Kayıt hatası oluştu.");
+        const error = err as AxiosError<{ detail?: string }>;
+        alert(error.response?.data?.detail || "Kayıt hatası oluştu.");
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+};
 
-  const handlePrintAll = () => {
-    window.print();
-  };
+
 
   return (
     <div className="min-h-screen bg-gray-50 font-roboto text-secondary text-left">
@@ -950,6 +1068,129 @@ const handlePrintChatbot = () => {
                 </div>
                 <textarea rows={5} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full p-5 md:p-8 rounded-2xl border-2 border-gray-100 bg-white text-black outline-none focus:border-amber-500 transition-all font-bold text-sm shadow-inner leading-relaxed" placeholder="Ders notlarını buraya yazabilirsiniz..." />
               </div>
+              {/* --- HAFTALIK HAZIRLIK (GİRİŞ) TESTİ DÜZENLEYİCİ --- */}
+{/* --- HAFTALIK HAZIRLIK (GİRİŞ) TESTİ DÜZENLEYİCİ --- */}
+{weekNumber > 1 && (
+  <div className="mt-12 p-6 md:p-10 bg-gradient-to-br from-[#1a1a1a] to-black rounded-[2.5rem] border-2 border-[#ce1212]/30 shadow-2xl space-y-8 text-left leading-normal relative overflow-hidden">
+    
+    {/* Estetik Arkaplan Süsü */}
+    <div className="absolute top-[-20px] right-[-20px] opacity-5 text-white rotate-12">
+      <ShieldCheck size={200} />
+    </div>
+
+    {/* ÜST BAŞLIK VE YENİ SORU EKLEME BUTONU */}
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-white/10 pb-8 gap-4 relative z-10">
+      <div className="flex items-center gap-4 text-white leading-none">
+        <div className="bg-[#ce1212] p-3 rounded-2xl shadow-lg shadow-red-900/20">
+          <RefreshCcw size={24} className="text-white" />
+        </div>
+        <div className="text-left leading-none">
+          <h3 className="font-black uppercase text-xs md:text-sm tracking-[0.2em] leading-none mb-2">Haftalık Giriş (Hatırlatıcı) Testi</h3>
+          <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest italic">
+            * Öğrenci bu haftaya girmeden önce test edilir. Yanlış cevapta, o sorunun bağlı olduğu hafta 2 günlüğüne açılır.
+          </p>
+        </div>
+      </div>
+      <button 
+        type="button" 
+        onClick={addEntryQuestion} 
+        className="w-full sm:w-auto bg-white/5 hover:bg-[#ce1212] text-white flex items-center justify-center gap-3 px-8 py-4 rounded-2xl text-[10px] font-black transition-all border border-white/10 shadow-xl active:scale-95 group"
+      >
+        <Plus size={18} className="group-hover:rotate-90 transition-transform" /> HATIRLATICI SORU EKLE
+      </button>
+    </div>
+
+    {/* SORU KARTLARI LİSTESİ */}
+    <div className="space-y-8 relative z-10">
+      {entryQuestions.map((q, qIndex) => (
+        <div key={qIndex} className="p-8 bg-white/5 rounded-[2.5rem] border border-white/10 space-y-6 relative group hover:border-[#ce1212]/50 transition-all shadow-inner">
+          
+          {/* Soru Silme Butonu */}
+          <button 
+            type="button" 
+            onClick={() => setEntryQuestions(entryQuestions.filter((_, i) => i !== qIndex))} 
+            className="absolute top-8 right-8 text-gray-600 hover:text-red-500 transition-colors p-2"
+          >
+            <Trash2 size={22} />
+          </button>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+            {/* 1. Soru Metni Giriş Alanı */}
+            <div className="md:col-span-8 space-y-2">
+              <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest ml-2">Soru Metni</label>
+              <textarea 
+                rows={2}
+                placeholder="Örn: 1. haftada işlenen temel veri yapıları nelerdir?" 
+                className="w-full p-5 bg-black/40 border border-white/10 rounded-2xl text-white font-bold text-sm outline-none focus:border-[#ce1212] transition-all shadow-inner resize-none"
+                value={q.question_text}
+                onChange={(e) => updateEntryQuestion(qIndex, 'question_text', e.target.value)}
+              />
+            </div>
+
+            {/* 2. Her Soruya Özel Hedef Hafta Seçicisi (Kritik Nokta) */}
+            <div className="md:col-span-4 space-y-2">
+              <label className="block text-[10px] font-black text-[#ce1212] uppercase tracking-widest ml-2 italic">Yanlış Yapılırsa Açılacak Hafta</label>
+              <div className="relative">
+                <select 
+                  className="w-full p-5 bg-[#1a1a1a] border-2 border-[#ce1212]/20 rounded-2xl text-white font-black text-sm outline-none cursor-pointer appearance-none hover:border-[#ce1212] transition-colors"
+                  value={q.target_week}
+                  onChange={(e) => updateEntryQuestion(qIndex, 'target_week', Number(e.target.value))}
+                >
+                  {/* Sadece geçmiş haftaları listeleme mantığı */}
+                  {Array.from({ length: weekNumber - 1 }, (_, i) => i + 1).map(n => (
+                    <option key={n} value={n} className="bg-black">
+                      Hafta {n} Konularına Yönlendir
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-[#ce1212]">
+                  <MapPin size={18} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 5 ŞIKLI GRID SİSTEMİ */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {q.options.map((opt, oIndex) => (
+              <div 
+                key={oIndex} 
+                className={`flex items-center gap-4 p-4 rounded-[1.5rem] border-2 transition-all ${
+                  opt.is_correct ? 'bg-green-500/10 border-green-500/40 shadow-[0_0_15px_rgba(34,197,94,0.1)]' : 'bg-white/5 border-white/5 hover:border-white/20'
+                }`}
+              >
+                <button 
+                  type="button" 
+                  onClick={() => setCorrectEntryOption(qIndex, oIndex)}
+                  className={`w-7 h-7 rounded-xl flex items-center justify-center transition-all ${
+                    opt.is_correct ? 'bg-green-500 text-white shadow-lg' : 'bg-white/10 text-gray-600 border border-white/10'
+                  }`}
+                >
+                  <Check size={16} strokeWidth={3} />
+                </button>
+                <input 
+                  type="text" 
+                  placeholder={`${oIndex + 1}. Seçenek içeriği`} 
+                  className="bg-transparent outline-none text-[11px] font-bold w-full text-white placeholder:text-gray-700"
+                  value={opt.option_text}
+                  onChange={(e) => updateEntryOption(qIndex, oIndex, e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+
+      {/* SORU YOKSA GÖSTERİLECEK BOŞ DURUM EKRANI */}
+      {entryQuestions.length === 0 && (
+        <div className="py-16 text-center border-4 border-dashed border-white/5 rounded-[3rem] bg-black/20">
+          <HelpCircle size={48} className="mx-auto text-gray-800 mb-4 opacity-20" />
+          <p className="text-gray-600 italic text-xs font-black uppercase tracking-[0.3em]">Henüz bir hatırlatıcı soru eklenmedi.</p>
+        </div>
+      )}
+    </div>
+  </div>
+)}
               
               <button type="submit" disabled={loading} className="w-full mt-10 bg-[#1a1a1a] text-white py-6 rounded-[2rem] font-black tracking-[0.2em] hover:bg-black transition-all flex justify-center items-center gap-3 shadow-2xl active:scale-95 text-xs md:text-sm uppercase leading-none">
                 <Save size={20} className="text-[#ce1212]" /> {loading ? "KAYDEDİLİYOR..." : "HAFTAYI KAYDET VE YAYINLA"}
