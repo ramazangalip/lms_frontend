@@ -51,6 +51,7 @@ interface Question {
 }
 
 interface Quiz {
+  id?: number | string; // Bu satır eksik olduğu için hata veriyor
   title: string;
   description: string;
   questions: Question[];
