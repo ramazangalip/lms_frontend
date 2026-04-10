@@ -5,7 +5,8 @@ import {
   PlayCircle, Headphones, FileText, ChevronRight, ChevronLeft,
   LogOut, Video, CheckCircle2, Send, X, Bot, Award, ArrowRight, 
   ListChecks, BookOpen, RefreshCcw, Sparkles, Lock, Menu,
-  ShieldCheck, Zap, Eye, AlertCircle, Calendar, Download
+  ShieldCheck, Zap, Eye, AlertCircle, Calendar, Download,
+  ShieldAlert
 } from 'lucide-react';
 
 // --- VERİ TİPİ TANIMLAMALARI ---
