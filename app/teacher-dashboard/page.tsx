@@ -41,13 +41,16 @@ import {
 // --- VERİ TİPİ TANIMLAMALARI ---
 
 interface Option {
+  id?: number | string; // Opsiyonel (yeni eklenenlerde id olmayabilir)
   option_text: string;
   is_correct: boolean;
 }
 
 interface Question {
+  id?: number | string; // Opsiyonel yaptık çünkü yeni eklenen sorularda ID henüz oluşmamış olabilir
   question_text: string;
   options: Option[];
+  order?: number;
 }
 
 interface Quiz {
