@@ -6,7 +6,8 @@ import {
   LogOut, Video, CheckCircle2, Send, X, Bot, Award, ArrowRight, 
   ListChecks, BookOpen, RefreshCcw, Sparkles, Lock, Menu,
   ShieldCheck, Zap, Eye, AlertCircle, Calendar, Download,
-  ShieldAlert
+  ShieldAlert,
+  XCircle
 } from 'lucide-react';
 
 // --- VERİ TİPİ TANIMLAMALARI ---
