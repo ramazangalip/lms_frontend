@@ -8,8 +8,10 @@ import {
   ShieldCheck, Zap, Eye, AlertCircle, Calendar, Download,
   ShieldAlert,
   XCircle,
-  Trophy
+  Trophy,
+  User
 } from 'lucide-react';
+import Link from 'next/link';
 
 // --- VERİ TİPİ TANIMLAMALARI ---
 interface Option { id: number; option_text: string; }
@@ -951,36 +953,22 @@ const handleEntryTestSubmit = async () => {
       /* --- 3. KADEME: NORMAL HAFTA İÇERİĞİ GÖRÜNÜMÜ (GRID YAPI) --- */
       <div className="max-w-screen-2xl mx-auto p-4 md:p-10">
         {/* Üst Bilgi Başlığı */}
-        <div className="mb-10 border-b pb-8 border-gray-100 flex flex-col gap-4">
-  <div className="flex items-center justify-between"> {/* Üst Kısım: Hafta Etiketi ve Rozetler */}
-    <div className="flex items-center gap-3">
-      <span className="bg-secondary text-white text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest">
-        HAFTA {selectedWeek.week_number}
+        <div className="mb-10 border-b pb-8 border-gray-100 flex flex-col gap-6">
+  {/* Üst Kısım: Hafta Etiketi */}
+  <div className="flex items-center gap-3">
+    <span className="bg-secondary text-white text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest">
+      HAFTA {selectedWeek.week_number}
+    </span>
+    {selectedWeek.current_attempt_round > 1 && (
+      <span className="bg-amber-100 text-amber-700 text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border border-amber-200 animate-pulse">
+        <RefreshCcw size={8} className="inline mr-1" /> 2. TUR (GELİŞİM)
       </span>
-      {selectedWeek.current_attempt_round > 1 && (
-        <span className="bg-amber-100 text-amber-700 text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border border-amber-200 animate-pulse">
-          <RefreshCcw size={8} className="inline mr-1" /> 2. TUR (GELİŞİM)
-        </span>
-      )}
-    </div>
-
-    {/* SAĞ TARAF: PUAN KARTI (İşaretlediğin Alan) */}
-    <div className="flex items-center gap-4">
-      <div className="bg-white border-2 border-gray-50 rounded-2xl p-3 shadow-sm flex items-center gap-3 hover:shadow-md transition-shadow">
-        <div className="bg-amber-400/10 p-2 rounded-xl">
-          <Trophy className="text-amber-500" size={20} />
-        </div>
-        <div className="text-right">
-          <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter leading-none mb-1">Toplam Puan</p>
-          <p className="text-xl font-black text-secondary leading-none">
-            {selectedWeek.total_score || 0} <span className="text-[10px] text-gray-400">Puan</span>
-          </p>
-        </div>
-      </div>
-    </div>
+    )}
   </div>
 
-  <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+  {/* BAŞLIK VE SAĞ TARAF (PUAN/PROFİL) AYNI HİZADA */}
+  <div className="flex flex-col md:flex-row items-start justify-between gap-6">
+    {/* SOL TARAF: BAŞLIK VE PROGRESS */}
     <div className="flex-1">
       <h1 className="text-xl md:text-3xl font-black text-secondary uppercase tracking-tighter leading-tight max-w-2xl">
         {selectedWeek.title}
@@ -996,6 +984,32 @@ const handleEntryTestSubmit = async () => {
         <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
           %{selectedWeek.progress || 0} TAMAMLANDI
         </span>
+      </div>
+    </div>
+
+    {/* SAĞ TARAF: PROFİL VE PUAN (Başlığın tam sağında) */}
+    <div className="flex items-center gap-3 shrink-0">
+      {/* Profil Butonu */}
+      <Link 
+        href="/profile" 
+        className="bg-white border-2 border-gray-50 rounded-2xl p-3 shadow-sm hover:shadow-md hover:border-blue-100 transition-all group flex items-center justify-center cursor-pointer"
+      >
+        <div className="bg-blue-500/10 p-2 rounded-xl group-hover:bg-blue-500 transition-colors">
+          <User className="text-blue-600 group-hover:text-white" size={20} />
+        </div>
+      </Link>
+
+      {/* Puan Kartı */}
+      <div className="bg-white border-2 border-gray-50 rounded-2xl p-3 shadow-sm flex items-center gap-3">
+        <div className="bg-amber-400/10 p-2 rounded-xl">
+          <Trophy className="text-amber-500" size={20} />
+        </div>
+        <div className="text-right">
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter leading-none mb-1">Toplam Puan</p>
+          <p className="text-xl font-black text-secondary leading-none">
+            {selectedWeek.total_score || 0} <span className="text-[10px] text-gray-400 font-bold">Puan</span>
+          </p>
+        </div>
       </div>
     </div>
   </div>
