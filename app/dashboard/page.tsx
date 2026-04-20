@@ -7,7 +7,8 @@ import {
   ListChecks, BookOpen, RefreshCcw, Sparkles, Lock, Menu,
   ShieldCheck, Zap, Eye, AlertCircle, Calendar, Download,
   ShieldAlert,
-  XCircle
+  XCircle,
+  Trophy
 } from 'lucide-react';
 
 // --- VERİ TİPİ TANIMLAMALARI ---
@@ -32,7 +33,8 @@ interface WeeklyContent {
   intro_description?: string; 
   intro_video_url?: string; 
   release_date?: string; 
-  is_locked: boolean; 
+  is_locked: boolean;
+  total_score?: number; // Burayı ekledik 
   lock_reason?: string; 
   is_intro_watched: boolean;
   materials: Material[]; 
@@ -544,71 +546,114 @@ const handleEntryTestSubmit = async () => {
       </div>
 
       {/* SOL MENÜ (SIDEBAR) */}
-      <aside className={`fixed inset-y-0 left-0 z-[100] w-72 bg-secondary shadow-2xl flex flex-col border-r border-gray-800 transition-transform duration-300 transform lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-5 border-b border-gray-700 bg-black/20 text-center flex items-center justify-between shrink-0">
-          <div className="w-full text-center ml-2">
-            <h2 className="logo-text text-lg text-white tracking-widest text-primary font-bold uppercase leading-none">BÜ-LMS</h2>
-            <p className="text-[9px] text-gray-500 uppercase mt-1.5 tracking-tighter text-center">ÖĞRENCİ PANELİ</p>
-          </div>
-          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-500 absolute right-4 top-5"><X size={20} /></button>
-        </div>
-        
-        <nav className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar leading-tight text-left">
-          <button onClick={() => { setIsIntroView(true); setActiveMaterial(null); }} className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all border ${isIntroView ? 'bg-primary border-primary text-white shadow-lg' : 'bg-gray-800/40 border-gray-700 text-gray-400 hover:bg-gray-800'}`}>
-            <div className="bg-white/10 p-1.5 rounded-lg shrink-0"><Video size={16}/></div>
-            <div className="text-left"><p className="text-[8px] font-black uppercase tracking-widest mb-1 text-gray-400">Tanıtım</p><p className="text-xs font-bold uppercase">TANITIM</p></div>
-          </button>
-          <div className="h-px bg-gray-700/50 mx-2 my-1" />
-          {[1,2,3,4,5,6,7,8,9,10,11,12,13,14].map((num) => {
-            const weekData = contents.find((c) => c.week_number === num);
-            const isActive = selectedWeek?.week_number === num && !isIntroView;
-            const isFinished = weekData?.is_completed;
-            const introLocked = !introStatus.isWatched;
-            const preTestLocked = !preTestResult?.is_completed;
-            const isWeekLocked = num >= 1 && (introLocked || preTestLocked);
-            const lockReason = introLocked 
-  ? "Önce tanıtım videosunu izlemelisiniz." 
-  : (preTestLocked ? "Önce ön değerlendirme testini bitirmelisiniz." : "");
+<aside className={`fixed inset-y-0 left-0 z-[100] w-72 bg-secondary shadow-2xl flex flex-col border-r border-gray-800 transition-transform duration-300 transform lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+  <div className="p-5 border-b border-gray-700 bg-black/20 text-center flex items-center justify-between shrink-0">
+    <div className="w-full text-center ml-2">
+      <h2 className="logo-text text-lg text-white tracking-widest text-primary font-bold uppercase leading-none">BÜ-LMS</h2>
+      <p className="text-[9px] text-gray-500 uppercase mt-1.5 tracking-tighter text-center">ÖĞRENCİ PANELİ</p>
+    </div>
+    <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-500 absolute right-4 top-5"><X size={20} /></button>
+  </div>
+  
+  <nav className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar leading-tight text-left">
+    <button 
+      onClick={() => { setIsIntroView(true); setActiveMaterial(null); }} 
+      className={`w-full flex items-center gap-3 p-3.5 rounded-xl transition-all border ${isIntroView ? 'bg-primary border-primary text-white shadow-lg' : 'bg-gray-800/40 border-gray-700 text-gray-400 hover:bg-gray-800'}`}
+    >
+      <div className="bg-white/10 p-1.5 rounded-lg shrink-0"><Video size={16}/></div>
+      <div className="text-left">
+        <p className="text-[8px] font-black uppercase tracking-widest mb-1 text-gray-400">Tanıtım</p>
+        <p className="text-xs font-bold uppercase">TANITIM</p>
+      </div>
+    </button>
 
-            return (
-              <div key={`sidebar-week-wrapper-${num}`} className="relative group">
-                <button 
-                  disabled={!weekData || isWeekLocked} 
-                  onClick={() => weekData && handleWeekSelection(weekData)} 
-                  className={`w-full flex items-center justify-between p-3.5 rounded-xl transition-all border ${isActive ? 'bg-primary border-primary text-white shadow-lg' : isWeekLocked ? 'bg-gray-900 border-gray-800 text-gray-600 cursor-not-allowed opacity-40' : weekData ? 'bg-gray-800/50 border-gray-700 text-gray-300 hover:bg-gray-700' : 'bg-transparent border-dashed border-gray-700 text-gray-700 opacity-20'}`}
-                >
-                  <div className="flex items-center gap-3 text-left">
-                    {isWeekLocked ? (
-                      <Lock size={14} className="text-gray-600" />
-                    ) : isFinished ? (
-                      <CheckCircle2 size={16} className="text-green-400" />
-                    ) : (
-                      <span className="text-[10px] font-bold">{num < 10 ? `0${num}` : num}</span>
-                    )}
-                    <div className="text-left leading-tight">
-                      <p className="text-xs font-semibold">Hafta {num}</p>
-                      {weekData && !isWeekLocked && <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mt-0.5">%{weekData.progress} TAMAMLANDI</p>}
-                      {isWeekLocked && weekData && <p className="text-[7px] text-red-500 font-bold uppercase mt-0.5">KİLİTLİ</p>}
-                    </div>
-                  </div>
-                  {weekData && !isWeekLocked && <ChevronRight size={12} className="opacity-40" />}
-                </button>
+    <div className="h-px bg-gray-700/50 mx-2 my-1" />
 
+    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map((num) => {
+      const weekData = contents.find((c) => c.week_number === num);
+      const isActive = selectedWeek?.week_number === num && !isIntroView;
+      const isFinished = weekData?.is_completed;
+      
+      // Temel kilitler (Intro ve Pre-test)
+      const introLocked = !introStatus.isWatched;
+      const preTestLocked = !preTestResult?.is_completed;
+      
+      // Backend'den gelen dinamik kilit (Tarih ve Sıralı İlerleme)
+      const isBackendLocked = weekData?.is_locked === true;
+
+      // Toplam kilit durumu
+      const isWeekLocked = num >= 1 && (introLocked || preTestLocked || isBackendLocked);
+
+      // Kilit mesajını belirle
+      let lockReason = "";
+      if (introLocked) {
+        lockReason = "Önce tanıtım videosunu izlemelisiniz.";
+      } else if (preTestLocked) {
+        lockReason = "Önce ön değerlendirme testini bitirmelisiniz.";
+      } else if (isBackendLocked) {
+        // Backend'den gelen spesifik mesajı kullan (Örn: "Hafta 2'yi bitirin" veya "Tarih: 01.05.2026")
+        lockReason = weekData?.lock_reason || "Bu içerik şu an erişime kapalıdır.";
+      }
+
+      return (
+        <div key={`sidebar-week-wrapper-${num}`} className="relative group">
+          <button 
+            disabled={!weekData || isWeekLocked} 
+            onClick={() => weekData && handleWeekSelection(weekData)} 
+            className={`w-full flex items-center justify-between p-3.5 rounded-xl transition-all border ${
+              isActive 
+                ? 'bg-primary border-primary text-white shadow-lg' 
+                : isWeekLocked 
+                  ? 'bg-gray-900 border-gray-800 text-gray-600 cursor-not-allowed opacity-40' 
+                  : weekData 
+                    ? 'bg-gray-800/50 border-gray-700 text-gray-300 hover:bg-gray-700' 
+                    : 'bg-transparent border-dashed border-gray-700 text-gray-700 opacity-20'
+            }`}
+          >
+            <div className="flex items-center gap-3 text-left">
+              {isWeekLocked ? (
+                <Lock size={14} className="text-gray-600" />
+              ) : isFinished ? (
+                <CheckCircle2 size={16} className="text-green-400" />
+              ) : (
+                <span className="text-[10px] font-bold">{num < 10 ? `0${num}` : num}</span>
+              )}
+              <div className="text-left leading-tight">
+                <p className="text-xs font-semibold">Hafta {num}</p>
+                {weekData && !isWeekLocked && (
+                  <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mt-0.5">
+                    %{weekData.progress || 0} TAMAMLANDI
+                  </p>
+                )}
                 {isWeekLocked && weekData && (
-                  <div className="hidden group-hover:block absolute left-full ml-2 top-0 w-48 bg-black text-white text-[9px] p-2 rounded-lg z-[110] shadow-xl border border-gray-700 animate-in fade-in slide-in-from-left-1">
-                    <p className="font-bold flex items-center gap-1 text-red-400 uppercase mb-1">
-                      <AlertCircle size={10} /> Erişim Engellendi
-                    </p>
-                    {lockReason}
-                  </div>
+                  <p className="text-[7px] text-red-500 font-bold uppercase mt-0.5">KİLİTLİ</p>
                 )}
               </div>
-            );
-          })}
-        </nav>
-       
-        <button onClick={handleLogout} className="p-5 border-t border-gray-700 flex items-center justify-center gap-2 text-gray-500 hover:text-primary transition-colors font-bold text-[10px] tracking-widest uppercase shrink-0"><LogOut size={14} /> GÜVENLİ ÇIKIŞ</button>
-      </aside>
+            </div>
+            {weekData && !isWeekLocked && <ChevronRight size={12} className="opacity-40" />}
+          </button>
+
+          {/* Tooltip: Kilit Nedenini Göster */}
+          {isWeekLocked && weekData && (
+            <div className="hidden group-hover:block absolute left-full ml-2 top-0 w-48 bg-black text-white text-[9px] p-2 rounded-lg z-[110] shadow-xl border border-gray-700 animate-in fade-in slide-in-from-left-1">
+              <p className="font-bold flex items-center gap-1 text-red-400 uppercase mb-1">
+                <AlertCircle size={10} /> Erişim Engellendi
+              </p>
+              {lockReason}
+            </div>
+          )}
+        </div>
+      );
+    })}
+  </nav>
+  
+  <button 
+    onClick={handleLogout} 
+    className="p-5 border-t border-gray-700 flex items-center justify-center gap-2 text-gray-500 hover:text-primary transition-colors font-bold text-[10px] tracking-widest uppercase shrink-0"
+  >
+    <LogOut size={14} /> GÜVENLİ ÇIKIŞ
+  </button>
+</aside>
 
       <main className="flex-1 overflow-y-auto bg-white custom-scrollbar pt-14 lg:pt-0">
        {/* --- HAFTA İÇERİĞİ ANA ALANI --- */}
@@ -907,29 +952,54 @@ const handleEntryTestSubmit = async () => {
       <div className="max-w-screen-2xl mx-auto p-4 md:p-10">
         {/* Üst Bilgi Başlığı */}
         <div className="mb-10 border-b pb-8 border-gray-100 flex flex-col gap-4">
-          <div className="flex items-center gap-3">
-            <span className="bg-secondary text-white text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest">
-              HAFTA {selectedWeek.week_number}
-            </span>
-            {selectedWeek.current_attempt_round > 1 && (
-              <span className="bg-amber-100 text-amber-700 text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border border-amber-200 animate-pulse">
-                <RefreshCcw size={8} className="inline mr-1" /> 2. TUR (GELİŞİM)
-              </span>
-            )}
-          </div>
-          <h1 className="text-xl md:text-3xl font-black text-secondary uppercase tracking-tighter leading-tight">
-            {selectedWeek.title}
-          </h1>
-          <div className="flex items-center gap-3">
-            <div className="flex-1 max-w-xs bg-gray-100 h-1.5 rounded-full overflow-hidden border shadow-inner">
-              <div 
-                className={`h-full transition-all duration-1000 ${selectedWeek.progress === 100 ? 'bg-green-500' : 'bg-primary'}`} 
-                style={{ width: `${selectedWeek.progress || 0}%` }} 
-              />
-            </div>
-            <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">%{selectedWeek.progress || 0} TAMAMLANDI</span>
-          </div>
+  <div className="flex items-center justify-between"> {/* Üst Kısım: Hafta Etiketi ve Rozetler */}
+    <div className="flex items-center gap-3">
+      <span className="bg-secondary text-white text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest">
+        HAFTA {selectedWeek.week_number}
+      </span>
+      {selectedWeek.current_attempt_round > 1 && (
+        <span className="bg-amber-100 text-amber-700 text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border border-amber-200 animate-pulse">
+          <RefreshCcw size={8} className="inline mr-1" /> 2. TUR (GELİŞİM)
+        </span>
+      )}
+    </div>
+
+    {/* SAĞ TARAF: PUAN KARTI (İşaretlediğin Alan) */}
+    <div className="flex items-center gap-4">
+      <div className="bg-white border-2 border-gray-50 rounded-2xl p-3 shadow-sm flex items-center gap-3 hover:shadow-md transition-shadow">
+        <div className="bg-amber-400/10 p-2 rounded-xl">
+          <Trophy className="text-amber-500" size={20} />
         </div>
+        <div className="text-right">
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter leading-none mb-1">Toplam Puan</p>
+          <p className="text-xl font-black text-secondary leading-none">
+            {selectedWeek.total_score || 0} <span className="text-[10px] text-gray-400">Puan</span>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+    <div className="flex-1">
+      <h1 className="text-xl md:text-3xl font-black text-secondary uppercase tracking-tighter leading-tight max-w-2xl">
+        {selectedWeek.title}
+      </h1>
+      
+      <div className="flex items-center gap-3 mt-4">
+        <div className="flex-1 max-w-xs bg-gray-100 h-1.5 rounded-full overflow-hidden border shadow-inner">
+          <div 
+            className={`h-full transition-all duration-1000 ${selectedWeek.progress === 100 ? 'bg-green-500' : 'bg-primary'}`} 
+            style={{ width: `${selectedWeek.progress || 0}%` }} 
+          />
+        </div>
+        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+          %{selectedWeek.progress || 0} TAMAMLANDI
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
 
         {/* ANA İÇERİK GRID: SOLDA LİSTE, SAĞDA İÇERİK */}
         <div className="flex flex-col lg:flex-row gap-10 items-start">
