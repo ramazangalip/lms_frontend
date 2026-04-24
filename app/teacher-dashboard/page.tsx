@@ -35,7 +35,8 @@ import {
   Award,
   Filter,
   MapPin,
-  Bot
+  Bot,
+  
 } from 'lucide-react';
 
 // --- VERİ TİPİ TANIMLAMALARI ---
@@ -177,6 +178,38 @@ interface StudentAnalytics {
   };
 }
 
+// 1. Her bir şıkkın (seçeneğin) yapısı
+interface SurveyOption {
+  id?: number | string;
+  option_text: string; // Örn: "Kesinlikle Katılıyorum"
+  value: number;       // Örn: 5
+}
+
+// 2. Her bir sorunun yapısı
+interface SurveyQuestion {
+  id?: number | string;
+  text: string;       // Soru metni
+  category: string;   // Alt boyut / Kategori
+  options: SurveyOption[]; // TypeScript artık 'options' alanını tanıyacak
+}
+
+// 3. Genel anket yapısı
+interface Survey {
+  id?: number | string;
+  title: string;
+  description: string;
+  week_number: number;
+  questions: SurveyQuestion[];
+}
+
+// 4. Akademisyen analiz ekranı verisi
+interface SurveyAnalysisResult {
+  student: string;
+  question: string;
+  answer: number; // Öğrencinin seçtiği şıkkın sayısal değeri
+  category: string;
+}
+
 export default function TeacherDashboard() {
   // --- STATE YÖNETİMİ ---
   const [activeTab, setActiveTab] = useState<'content' | 'analytics' | 'chatbot'>('content');  const [loading, setLoading] = useState(false);
@@ -199,6 +232,59 @@ export default function TeacherDashboard() {
   const [flashcards, setFlashcards] = useState<Flashcard[]>([]);
   const [chatbotData, setChatbotData] = useState<ChatbotReportData[]>([]);
   const [entryQuestions, setEntryQuestions] = useState<EntryQuestion[]>([]);
+
+  const [surveys, setSurveys] = useState<Survey[]>([]);
+  const [selectedSurveyId, setSelectedSurveyId] = useState<string>('1');
+  const [surveyAnalysis, setSurveyAnalysis] = useState<SurveyAnalysisResult[]>([]);
+  const [isSurveyActive, setIsSurveyActive] = useState(false); // Bu hafta anket var mı?
+  const [surveyQuestions, setSurveyQuestions] = useState<SurveyQuestion[]>([]);
+  const [surveyTitle, setSurveyTitle] = useState("");
+
+  // Yeni Soru Ekleme (İçinde boş şıklarla beraber)
+const addSurveyQuestion = () => {
+  setSurveyQuestions([
+    ...surveyQuestions,
+    { 
+      text: "", 
+      category: "", 
+      options: [
+        { option_text: "", value: 1 },
+        { option_text: "", value: 2 },
+        { option_text: "", value: 3 },
+        { option_text: "", value: 4 },
+        { option_text: "", value: 5 }
+      ] 
+    }
+  ]);
+};
+
+// Şık Metnini Güncelleme
+const updateSurveyOption = (qIdx: number, oIdx: number, text: string) => {
+  setSurveyQuestions(prevQuestions => {
+    // 1. Ana diziyi kopyala
+    const newQuestions = [...prevQuestions];
+    // 2. Güncellenecek soruyu kopyala
+    const targetQuestion = { ...newQuestions[qIdx] };
+    // 3. Sorunun içindeki options dizisini kopyala
+    const newOptions = [...targetQuestion.options];
+    // 4. İlgili seçeneği güncelle
+    newOptions[oIdx] = { ...newOptions[oIdx], option_text: text };
+    
+    // 5. Parçaları birleştir
+    targetQuestion.options = newOptions;
+    newQuestions[qIdx] = targetQuestion;
+    
+    return newQuestions;
+  });
+};
+
+const updateSurveyQuestion = (index: number, field: keyof SurveyQuestion, value: string) => {
+  setSurveyQuestions(prev => {
+    const newQs = [...prev];
+    newQs[index] = { ...newQs[index], [field]: value };
+    return newQs;
+  });
+};
 
   // --- BÖLÜM LİSTESİ ---
   const departmentList = [
@@ -265,48 +351,83 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
 
   // --- HAFTA DETAYI ÇEKME ---
   // --- HAFTA DETAYI ÇEKME ---
+  // --- HAFTA DETAYI ÇEKME ---
   const fetchWeekDetail = useCallback(async (week: number) => {
     setFetchingWeek(true);
     try {
       const res = await api.get(`/contents/list/?week_number=${week}`);
       const data = res.data;
       
-      // Temel İçerik Bilgileri
+      // 1. Temel İçerik Bilgileri
       setIntroDescription(data.intro_description || '');
       setTitle(data.title || '');
       setDescription(data.description || '');
 
-      // Tarih Formatlama
+      // 2. Tarih Formatlama
       if (data.release_date) {
         setReleaseDate(data.release_date.split('T')[0]);
       } else {
         setReleaseDate('');
       }
 
-      // Oryantasyon Bilgileri
+      // 3. Oryantasyon Bilgileri
       if (data.intro_video_url !== undefined) {
         setIntroVideoUrl(data.intro_video_url || '');
         setIntroTitle(data.intro_title || 'Genel Tanıtım ve Oryantasyon');
       }
 
-      // Materyaller
+      // 4. Materyaller
       if (data.materials && data.materials.length > 0) {
         setMaterials(data.materials);
       } else {
         setMaterials([{ content_type: 'video', embed_url: '', title: '', point_value: 10 }]);
       }
 
-      // Flashcardlar
+      // 5. Flashcardlar ve Giriş Testleri
       setFlashcards(data.flashcards || []);
       setEntryQuestions(data.entry_questions || []);
 
-      // --- KRİTİK GÜNCELLEME: ÖN TEST SORULARINI YÜKLE ---
+      // --- 6. ANKET (SURVEY) VERİLERİNİ YÜKLE ---
+      if (data.survey_data) {
+        setIsSurveyActive(true); 
+        
+        // ANKET BAŞLIĞI: Backend 'title' gönderiyor, 'setSurveyTitle' varsa set ediyoruz
+        // Eğer 'setSurveyTitle' diye bir state'in yoksa bileşene eklemeyi unutma
+        if (typeof setSurveyTitle === 'function') {
+           setSurveyTitle(data.survey_data.title || '');
+        }
+
+        // ANKET SORULARI VE ŞIKLARI
+        if (data.survey_data.questions && data.survey_data.questions.length > 0) {
+          const formattedSurveyQuestions = data.survey_data.questions.map((q: any) => ({
+            id: q.id,
+            text: q.text, // Backend'den gelen 'text'
+            category: q.category || '',
+            // ŞIKLAR: Backend'den gelen 'options' dizisini kontrol et
+            options: q.options && q.options.length > 0 ? q.options : [
+              // Eğer veritabanında şık yoksa hoca için varsayılan taslağı oluştur
+              { option_text: "Hiçbir zaman", value: 1 },
+              { option_text: "Ender olarak", value: 2 },
+              { option_text: "Bazen", value: 3 },
+              { option_text: "Sıklıkla", value: 4 },
+              { option_text: "Her zaman", value: 5 }
+            ]
+          }));
+          setSurveyQuestions(formattedSurveyQuestions);
+        } else {
+          setSurveyQuestions([]);
+        }
+      } else {
+        setIsSurveyActive(false);
+        setSurveyQuestions([]);
+        if (typeof setSurveyTitle === 'function') setSurveyTitle('');
+      }
+
+      // --- 7. ÖN TEST SORULARINI YÜKLE (Hafta 1 Özel) ---
       if (week === 1) {
         if (data.pre_test_questions && data.pre_test_questions.length > 0) {
-          // Eğer veritabanında soru varsa onları state'e bas
           setPreTestQuestions(data.pre_test_questions);
         } else {
-          // Eğer veritabanı boşsa (yeni kurulum), hoca için 1 tane boş taslak soru bırak
           setPreTestQuestions([
             {
               question_text: "",
@@ -321,7 +442,6 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
           ]);
         }
       } else {
-        // 1. haftada değilsek, state'i temizle (bellek yönetimi için)
         setPreTestQuestions([]);
       }
 
@@ -334,10 +454,13 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
       setMaterials([{ content_type: 'video', embed_url: '', title: '', point_value: 10 }]);
       setFlashcards([]);
       setPreTestQuestions([]);
+      setIsSurveyActive(false);
+      setSurveyQuestions([]);
+      if (typeof setSurveyTitle === 'function') setSurveyTitle('');
     } finally {
       setFetchingWeek(false);
     }
-  }, []);
+  }, [setIsSurveyActive, setSurveyQuestions]);
 
   // --- İZLEYİCİ (TRIGGER) ---
   useEffect(() => {
@@ -576,7 +699,7 @@ const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
   };
 
   // --- KAYDETME VE YAYINLAMA ---
-  const handleSubmit = async (e: React.FormEvent) => {
+ const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
@@ -589,16 +712,36 @@ const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
             intro_video_url: introVideoUrl,
             intro_description: introDescription,
 
+            // --- YENİ: ANKET / ÖLÇEK VERİLERİ ---
+            // isSurveyActive state'ine göre anketi gönderiyoruz
+            has_survey: isSurveyActive,
+            survey_title: selectedSurveyId, // Seçilen veya girilen ölçek başlığı
+            survey_questions: isSurveyActive 
+                ? surveyQuestions
+                    .filter(q => q.text.trim() !== "") // Boş soruları temizle
+                    .map((q, index) => ({
+                        ...(q.id ? { id: q.id } : {}), // Varsa ID'yi koru
+                        text: q.text,
+                        category: q.category,
+                        order: index,
+                        // Şıkları (Likert değerlerini) gönder
+                        options: q.options.map(opt => ({
+                            ...(opt.id ? { id: opt.id } : {}),
+                            option_text: opt.option_text,
+                            value: opt.value
+                        }))
+                    }))
+                : [],
+
             // --- MATERYALLER (ID KORUMALI) ---
             materials: materials
                 .filter(m => m.title.trim() !== "")
                 .map((m) => ({
-                    ...(m.id ? { id: m.id } : {}), // KRİTİK: ID varsa gönder, yoksa yeni oluşturur
+                    ...(m.id ? { id: m.id } : {}),
                     title: m.title,
                     content_type: m.content_type,
                     embed_url: m.embed_url,
                     point_value: m.point_value,
-                    // Eğer materyal bir sınavsa (form) onun içindeki quiz ve soru ID'lerini de korumalıyız
                     ...(m.quiz ? {
                         quiz: {
                             ...(m.quiz.id ? { id: m.quiz.id } : {}),
@@ -618,52 +761,44 @@ const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
                     } : {})
                 })),
 
-            // Kaynaklar (ID Korumalı)
-            flashcards: flashcards
-                .filter(f => f.question.trim() !== "")
-                .map((f, index) => ({ 
-                    ...(f.id ? { id: f.id } : {}), // ID Koruması
-                    question: f.question,
-                    answer: f.answer,
-                    order: index 
-                })),
+            // Kaynaklar, Pre-Test ve Giriş Soruları kısımları aynı kalıyor...
+            flashcards: flashcards.filter(f => f.question.trim() !== "").map((f, index) => ({ 
+                ...(f.id ? { id: f.id } : {}),
+                question: f.question,
+                answer: f.answer,
+                order: index 
+            })),
 
-            // 1. HAFTA: Pre-Test (ID Korumalı)
             pre_test_questions: Number(weekNumber) === 1 
-                ? preTestQuestions
-                    .filter(q => q.question_text.trim() !== "")
-                    .map((q, qIdx) => ({
-                        ...(q.id ? { id: q.id } : {}),
-                        question_text: q.question_text,
-                        order: qIdx,
-                        options: q.options.map(opt => ({
-                            ...(opt.id ? { id: opt.id } : {}),
-                            option_text: opt.option_text,
-                            is_correct: opt.is_correct
-                        }))
+                ? preTestQuestions.filter(q => q.question_text.trim() !== "").map((q, qIdx) => ({
+                    ...(q.id ? { id: q.id } : {}),
+                    question_text: q.question_text,
+                    order: qIdx,
+                    options: q.options.map(opt => ({
+                        ...(opt.id ? { id: opt.id } : {}),
+                        option_text: opt.option_text,
+                        is_correct: opt.is_correct
                     }))
+                }))
                 : [],
 
-            // Giriş Soruları (Zaten doğru yapmıştın ama üzerinden geçelim)
             entry_questions: Number(weekNumber) > 1 
-                ? entryQuestions
-                    .filter(q => q.question_text.trim() !== "")
-                    .map((q, index) => ({
-                        ...(q.id ? { id: q.id } : {}),
-                        question_text: q.question_text,
-                        order: index,
-                        target_week: q.target_week, 
-                        options: q.options.map(opt => ({
-                            ...(opt.id ? { id: opt.id } : {}),
-                            option_text: opt.option_text,
-                            is_correct: opt.is_correct
-                        }))
-                    })) 
+                ? entryQuestions.filter(q => q.question_text.trim() !== "").map((q, index) => ({
+                    ...(q.id ? { id: q.id } : {}),
+                    question_text: q.question_text,
+                    order: index,
+                    target_week: q.target_week, 
+                    options: q.options.map(opt => ({
+                        ...(opt.id ? { id: opt.id } : {}),
+                        option_text: opt.option_text,
+                        is_correct: opt.is_correct
+                    }))
+                })) 
                 : [],
         };
 
         await api.post('/contents/list/', payload);
-        alert("Haftalık içerik başarıyla güncellendi.");
+        alert("Haftalık içerik ve anket başarıyla güncellendi.");
         fetchWeekDetail(weekNumber);
     } catch (err) {
         const error = err as AxiosError<{ detail?: string }>;
@@ -1062,6 +1197,7 @@ const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
                 </div>
               </div>
 
+
               <div className="mt-10 p-6 md:p-8 bg-amber-50/30 rounded-3xl border-2 border-amber-100 shadow-sm space-y-6">
                 <div className="flex items-center gap-3 text-amber-600 border-b border-amber-100 pb-4 leading-none">
                   <Calendar size={24} />
@@ -1183,6 +1319,7 @@ const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
             ))}
           </div>
         </div>
+        
       ))}
 
       {/* SORU YOKSA GÖSTERİLECEK BOŞ DURUM EKRANI */}
@@ -1195,6 +1332,156 @@ const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
     </div>
   </div>
 )}
+
+<div className="mt-12 p-6 md:p-10 bg-gradient-to-br from-purple-50 to-white rounded-[2.5rem] border-2 border-purple-200 shadow-xl space-y-8 text-left leading-normal animate-in fade-in slide-in-from-top-4 duration-700">
+  
+  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center border-b border-purple-100 pb-6 gap-4">
+    <div className="flex items-center gap-4 text-purple-900 leading-none">
+      <div className="bg-purple-600 p-3 rounded-2xl shadow-lg shadow-purple-900/20">
+        <FileText size={24} className="text-white" />
+      </div>
+      <div className="text-left leading-none">
+        <h3 className="font-black uppercase text-xs md:text-sm tracking-[0.2em] leading-none mb-2">Haftalık Bilimsel Ölçek Takibi</h3>
+        <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest italic">
+          * Bu anket tamamlanmadan haftalık materyaller öğrenciye açılmaz (Kilit Mekanizması).
+        </p>
+      </div>
+    </div>
+    
+    {/* Aktif/Pasif Toggle */}
+    <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-2xl border border-purple-100 shadow-sm">
+      <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">ANKET KİLİDİ:</span>
+      <button 
+        type="button"
+        onClick={() => setIsSurveyActive(!isSurveyActive)}
+        className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors focus:outline-none ${isSurveyActive ? 'bg-purple-600' : 'bg-gray-200'}`}
+      >
+        <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isSurveyActive ? 'translate-x-7' : 'translate-x-1'}`} />
+      </button>
+    </div>
+  </div>
+
+  {isSurveyActive ? (
+    <div className="space-y-8 animate-in zoom-in-95 duration-300">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-end">
+        <div className="space-y-3">
+          <label className="block text-[10px] font-black text-purple-400 uppercase tracking-widest ml-2 flex items-center gap-2">
+            <Filter size={12} /> Uygulanacak Ölçek / Anket Başlığı
+          </label>
+          <div className="relative">
+            <input 
+              type="text"
+              placeholder="Örn: Teknoloji Kabul Ölçeği"
+              className="w-full p-5 bg-white border-2 border-purple-100 rounded-2xl text-black font-black text-sm outline-none focus:border-purple-600 transition-all shadow-inner"
+              value={surveyTitle}
+              onChange={(e) => setSelectedSurveyId(e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Yeni Soru Ekleme Butonu */}
+        <button 
+          type="button" 
+          onClick={addSurveyQuestion}
+          className="w-full md:w-auto bg-purple-600 text-white flex items-center justify-center gap-3 px-8 py-4 rounded-2xl text-[10px] font-black hover:bg-purple-900 transition-all shadow-xl active:scale-95 group"
+        >
+          <Plus size={18} className="group-hover:rotate-90 transition-transform" /> YENİ ANKET SORUSU EKLE
+        </button>
+      </div>
+
+      {/* DİNAMİK SORU VE ŞIK LİSTESİ */}
+      <div className="space-y-6">
+        <h4 className="text-[10px] font-black text-purple-900 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+          <ListChecks size={16} /> Anket Soru Maddeleri ve Derecelendirme
+        </h4>
+        
+        {surveyQuestions.map((q, qIndex) => (
+          <div key={qIndex} className="p-8 bg-white rounded-[2.5rem] border-2 border-purple-100 shadow-sm space-y-6 relative group hover:border-purple-300 transition-all">
+            
+            <button 
+              type="button"
+              onClick={() => setSurveyQuestions(surveyQuestions.filter((_, i) => i !== qIndex))}
+              className="absolute top-8 right-8 text-gray-300 hover:text-red-500 transition-colors p-2"
+            >
+              <Trash2 size={22} />
+            </button>
+
+            <div className="flex gap-6 items-start pr-12">
+              <span className="bg-purple-600 text-white w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm shrink-0 shadow-lg">
+                {qIndex + 1}
+              </span>
+              
+              <div className="flex-1 w-full space-y-4">
+                <div className="space-y-1">
+                  <label className="block text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Soru Metni</label>
+                  <input 
+                    type="text"
+                    placeholder="Anket sorusunu buraya yazınız..."
+                    className="w-full p-2 border-b-2 border-gray-100 focus:border-purple-500 outline-none font-bold text-base bg-transparent text-secondary"
+                    value={q.text}
+                    onChange={(e) => updateSurveyQuestion(qIndex, 'text', e.target.value)}
+                  />
+                </div>
+                
+                <div className="flex items-center gap-3 bg-purple-50/50 p-2 rounded-lg w-fit">
+                  <Type size={12} className="text-purple-400" />
+                  <input 
+                    type="text"
+                    placeholder="Kategori (Örn: Algılanan Fayda)"
+                    className="text-[9px] font-black text-purple-600 uppercase tracking-widest bg-transparent outline-none min-w-[200px]"
+                    value={q.category}
+                    onChange={(e) => updateSurveyQuestion(qIndex, 'category', e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* MANUEL ŞIK GİRİŞ ALANI (Likert 1-5) */}
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-4 pl-16">
+              {q.options?.map((opt, oIndex) => (
+                <div key={oIndex} className="space-y-2">
+                  <label className="text-[8px] font-black text-gray-400 uppercase ml-1 flex items-center gap-1">
+                    <CheckCircle size={10} className="text-purple-300" /> Derece {opt.value}
+                  </label>
+                  <input 
+                    type="text"
+                    placeholder={`Şık ${opt.value} metni...`}
+                    className="w-full p-3 bg-purple-50/30 border border-purple-100 rounded-xl text-[10px] font-bold text-purple-900 outline-none focus:border-purple-400 transition-colors"
+                    value={opt.option_text}
+                    onChange={(e) => updateSurveyOption(qIndex, oIndex, e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+        
+        {surveyQuestions.length === 0 && (
+          <div className="text-center py-16 border-4 border-dashed border-purple-100 rounded-[3rem] bg-white/50">
+            <HelpCircle size={48} className="mx-auto text-purple-200 mb-4 opacity-40" />
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em]">Henüz bir anket sorusu eklenmedi.</p>
+          </div>
+        )}
+      </div>
+
+      {/* UYARI VE BİLGİLENDİRME */}
+      <div className="p-6 bg-purple-100/40 rounded-3xl border border-purple-200 flex items-start gap-4 shadow-inner">
+        <AlertCircle className="text-purple-600 shrink-0" size={24} />
+        <div className="text-left leading-tight">
+          <p className="text-[10px] font-black text-purple-900 uppercase tracking-widest mb-1">Önemli Kilit Bildirimi</p>
+          <p className="text-[10px] font-bold text-purple-800 leading-relaxed uppercase italic">
+            Bu anket 5&apos;li Likert yapısındadır. Öğrenci {weekNumber}. haftanın içeriğini görmeden önce tüm şıkları doldurulmuş bu anketi yanıtlamak zorundadır.
+          </p>
+        </div>
+      </div>
+    </div>
+  ) : (
+    <div className="py-16 text-center border-4 border-dashed border-purple-100 rounded-[3rem] bg-white/50 shadow-inner">
+       <ShieldCheck size={56} className="mx-auto text-purple-200 mb-4 opacity-40" />
+       <p className="text-gray-400 italic text-[11px] font-black uppercase tracking-[0.4em]">Anket kilidi bu hafta için aktif değil.</p>
+    </div>
+  )}
+</div>
               
               <button type="submit" disabled={loading} className="w-full mt-10 bg-[#1a1a1a] text-white py-6 rounded-[2rem] font-black tracking-[0.2em] hover:bg-black transition-all flex justify-center items-center gap-3 shadow-2xl active:scale-95 text-xs md:text-sm uppercase leading-none">
                 <Save size={20} className="text-[#ce1212]" /> {loading ? "KAYDEDİLİYOR..." : "HAFTAYI KAYDET VE YAYINLA"}
