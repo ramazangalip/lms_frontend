@@ -711,27 +711,43 @@ const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
             intro_title: introTitle,
             intro_video_url: introVideoUrl,
             intro_description: introDescription,
+           has_survey: isSurveyActive,
+    survey_title: selectedSurveyId, 
+    
+    survey_questions: isSurveyActive 
+        ? surveyQuestions
+            .filter((q: SurveyQuestion) => q.text && q.text.trim() !== "") 
+            .map((q: SurveyQuestion, index: number) => {
+                // Her bir soru için objeyi oluşturuyoruz
+                const questionData: any = {
+                    text: q.text,
+                    category: q.category || "",
+                    order: index,
+                    // Şıklar (options) döngüsü
+                    options: (q.options && q.options.length > 0) 
+                        ? q.options.map((opt: SurveyOption) => {
+                            const optionData: any = {
+                                option_text: opt.option_text || "",
+                                value: opt.value !== undefined ? opt.value : 0
+                            };
+                            
+                            // Interface'deki id? sayesinde artık hata vermez
+                            if (opt.id) {
+                                optionData.id = opt.id;
+                            }
+                            return optionData;
+                        })
+                        : []
+                };
 
-            // --- YENİ: ANKET / ÖLÇEK VERİLERİ ---
-            // isSurveyActive state'ine göre anketi gönderiyoruz
-            has_survey: isSurveyActive,
-            survey_title: selectedSurveyId, // Seçilen veya girilen ölçek başlığı
-            survey_questions: isSurveyActive 
-                ? surveyQuestions
-                    .filter(q => q.text.trim() !== "") // Boş soruları temizle
-                    .map((q, index) => ({
-                        ...(q.id ? { id: q.id } : {}), // Varsa ID'yi koru
-                        text: q.text,
-                        category: q.category,
-                        order: index,
-                        // Şıkları (Likert değerlerini) gönder
-                        options: q.options.map(opt => ({
-                            ...(opt.id ? { id: opt.id } : {}),
-                            option_text: opt.option_text,
-                            value: opt.value
-                        }))
-                    }))
-                : [],
+                // Soru ID'si varsa ekliyoruz
+                if (q.id) {
+                    questionData.id = q.id;
+                }
+                
+                return questionData;
+            })
+        : [],
 
             // --- MATERYALLER (ID KORUMALI) ---
             materials: materials
