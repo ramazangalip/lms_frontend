@@ -36,6 +36,8 @@ import {
   Filter,
   MapPin,
   Bot,
+  ChevronRight,
+  ChevronLeft,
   
 } from 'lucide-react';
 
@@ -239,6 +241,9 @@ export default function TeacherDashboard() {
   const [isSurveyActive, setIsSurveyActive] = useState(false); // Bu hafta anket var mı?
   const [surveyQuestions, setSurveyQuestions] = useState<SurveyQuestion[]>([]);
   const [surveyTitle, setSurveyTitle] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0)
+ 
 
   // Yeni Soru Ekleme (İçinde boş şıklarla beraber)
 const addSurveyQuestion = () => {
@@ -470,45 +475,51 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
   }, [weekNumber, activeTab, fetchWeekDetail]);
 
 // --- ANALİZ VERİLERİNİ ÇEKME ---
-  // selectedDepartment değiştikçe bu fonksiyon kendini günceller
-  // --- ANALİZ VERİLERİNİ ÇEKME ---
-  const fetchAnalytics = useCallback(async () => {
-    // Güvenlik: Departman seçili değilse veya 'all' ise (tedbir amaçlı) istek atma
+  const fetchAnalytics = useCallback(async (page = 1) => {
+    // Güvenlik: Departman seçili değilse veya 'all' ise istek atma
     if (!selectedDepartment || selectedDepartment === 'all') return;
 
     setLoading(true);
-    // KRİTİK: Yeni veri gelene kadar eski verileri temizle ki liste anlık sıfırlansın
+    // Yeni veri gelene kadar eski verileri temizle
     setAnalytics([]); 
-    setBulkData([]);
+    // Not: Toplu rapor (bulkRes) genellikle sayfalandırılmaz, tüm bölümü kapsar.
+    // Ancak analytics (res) artık sayfalı geliyor.
 
     try {
-      // Sadece seçili departman parametresiyle istek atıyoruz
+      // Sayfa numarasını query param olarak ekliyoruz
       const [res, bulkRes] = await Promise.all([
-        api.get(`/contents/analytics/?department=${selectedDepartment}`),
+        api.get(`/contents/analytics/?department=${selectedDepartment}&page=${page}`),
         api.get(`/contents/bulk-academic-report/?department=${selectedDepartment}`)
       ]);
       
-      setAnalytics(res.data);
+      // KRİTİK: Backend artık { results: [], count: x } döndüğü için .results kullanıyoruz
+      if (res.data.results) {
+        setAnalytics(res.data.results);
+        // İstersen burada toplam sayfa sayısını hesaplamak için bir state güncelleyebilirsin:
+        // setTotalCount(res.data.count); 
+      } else {
+        // Eğer sayfalandırma bir şekilde kapalıysa eski uyumluluk için:
+        setAnalytics(res.data);
+      }
+
       setBulkData(bulkRes.data);
     } catch (err) {
       console.error("Analiz verileri yüklenemedi:", err);
-      // Hata durumunda listelerin boş kaldığından emin ol
       setAnalytics([]); 
       setBulkData([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedDepartment]); // selectedDepartment değiştikçe fonksiyon kendini günceller
+  }, [selectedDepartment]);
 
-  // Sekme (Tab) değiştiğinde veriyi tetikle
- // --- KRİTİK: BÖLÜM DEĞİŞTİĞİNDE VERİYİ ANLIK ÇEK ---
+  // --- KRİTİK: BÖLÜM VEYA SAYFA DEĞİŞTİĞİNDE VERİYİ ÇEK ---
   useEffect(() => {
-    // Eğer analiz sekmesindeysek VE bir bölüm seçiliyse veriyi çek
     if (activeTab === 'analytics' && selectedDepartment) {
-      console.log(`${selectedDepartment} için veriler güncelleniyor...`);
-      fetchAnalytics();
+      // Bölüm değiştiğinde sayfayı 1'e resetlemek mantıklı olabilir
+      // setCurrentPage(1); 
+      fetchAnalytics(currentPage);
     }
-  }, [activeTab, selectedDepartment, fetchAnalytics]); // <-- selectedDepartment buraya eklendi!
+  }, [activeTab, selectedDepartment, currentPage, fetchAnalytics]);
 
   const fetchChatbotAnalytics = useCallback(async () => {
   if (!selectedDepartment || selectedDepartment === 'all') return;
@@ -830,94 +841,111 @@ const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
     <div className="min-h-screen bg-gray-50 font-roboto text-secondary text-left">
 
 
-     {/* 1. PDF ŞABLONU (Gizli - Sadece Yazıcıda Görünür) */}
+ {/* --- 1. PDF ŞABLONU (Gizli - Sadece Yazıcıda Görünür) --- */}
 <div id="bulk-report-pdf" className="hidden print:block bg-white p-0 text-left">
-  {/* Veriyi 6'şarlı gruplara bölerek haritalıyoruz */}
   {Array.from({ length: Math.ceil(filteredBulkData.length / 6) }, (_, i) =>
     filteredBulkData.slice(i * 6, i * 6 + 6)
   ).map((studentGroup, pageIdx) => (
-    <div key={pageIdx} className="p-10 text-left" style={{ pageBreakAfter: 'always' }}>
-      {/* LOGO VE BAŞLIK (Her sayfanın başında tekrar eder) */}
-      <div className="flex flex-col items-center mb-10 border-b-4 border-black pb-8 text-center">
-        <img src="/okul-logo.png" alt="Okul Logosu" className="h-28 object-contain mb-6" onError={(e) => (e.currentTarget.style.display = 'none')} />
-        <h1 className="text-3xl font-black uppercase tracking-tighter text-black">SİSTEM GENELİ AKADEMİK GELİŞİM VE PERFORMANS ÇİZELGESİ</h1>
-        <p className="text-lg font-bold text-gray-700 mt-2 uppercase tracking-widest">
+    <div 
+      key={pageIdx} 
+      className="p-4 text-left" 
+      style={{ 
+        pageBreakAfter: 'always', 
+        width: '297mm', // Yatay A4 standardı
+        margin: '0 auto' 
+      }}
+    >
+      {/* LOGO VE BAŞLIK */}
+      <div className="flex flex-col items-center mb-6 border-b-4 border-black pb-4 text-center">
+        <img src="/okul-logo.png" alt="Okul Logosu" className="h-16 object-contain mb-3" onError={(e) => (e.currentTarget.style.display = 'none')} />
+        <h1 className="text-xl font-black uppercase tracking-tighter text-black">SİSTEM GENELİ AKADEMİK GELİŞİM VE PERFORMANS ÇİZELGESİ</h1>
+        <p className="text-xs font-bold text-gray-700 mt-1 uppercase tracking-widest">
           Bölüm: {getDeptName(selectedDepartment).toUpperCase()} (Sayfa {pageIdx + 1})
         </p>
-        <div className="flex gap-10 mt-4 text-[10px] font-black uppercase text-gray-500">
-          <span>Ders: Dijital Okuryazarlık</span>
-          <span>Rapor Tarihi: {new Date().toLocaleDateString('tr-TR')}</span>
-          <span>Gruptaki Öğrenci: {studentGroup.length}</span>
-        </div>
       </div>
 
-      {/* GRUP TABLOSU */}
-      <table className="w-full border-collapse border-2 border-black">
+      {/* GRUP TABLOSU - table-fixed ve Optimize Edilmiş Genişlikler */}
+      <table className="w-full border-collapse border-2 border-black table-fixed">
         <thead>
           <tr className="bg-black text-white text-center">
-            <th className="border-2 border-black p-3 text-[10px] font-black uppercase leading-none text-left w-48">Öğrenci Adı Soyadı</th>
-            <th className="border-2 border-black p-3 text-[10px] font-black uppercase leading-none text-center bg-gray-200">ÖN TEST</th>
+            {/* İsim sütunu daraltıldı: %8 */}
+            <th className="border-2 border-black p-1 text-[8px] font-black uppercase leading-none text-left w-[8%]">Öğrenci</th>
+            {/* Ön Test: %4 */}
+            <th className="border-2 border-black p-1 text-[8px] font-black uppercase leading-none text-center bg-gray-200 text-black w-[4%]">ÖN TEST</th>
+            
+            {/* 14 Hafta Sütunları - Her biri %5.75 (Toplam %80.5) */}
             {Array.from({ length: 14 }, (_, i) => i + 1).map(n => (
-              <th key={n} className="border-2 border-black p-1 text-[7px] font-black uppercase leading-none text-center w-32">
-                H.{n} ANALİZİ
+              <th key={n} className="border-2 border-black p-0.5 text-[6px] font-black uppercase leading-none text-center w-[5.75%]">
+                H.{n}
               </th>
             ))}
-            <th className="border-2 border-black p-3 text-[10px] font-black uppercase leading-none text-center bg-gray-800">Top. Puan</th>
-            <th className="border-2 border-black p-3 text-[10px] font-black uppercase text-center bg-gray-800">Top. Süre</th>
+            
+            {/* Genel Toplam: %7.5 */}
+            <th className="border-2 border-black p-1 text-[9px] font-black uppercase leading-none text-center bg-gray-800 w-[7.5%]">GENEL TOPLAM</th>
           </tr>
         </thead>
         <tbody className="text-left font-bold">
           {studentGroup.map((student, idx) => (
-            <tr key={idx} className="text-center hover:bg-gray-50 leading-none">
-              <td className="border-2 border-black p-3 text-[10px] font-black text-left uppercase leading-tight">{student.full_name}</td>
-              <td className="border-2 border-black p-3 text-[9px] font-black text-center italic bg-gray-50/50">
-                {student.pre_test_score || "Girilmedi"}
+            <tr key={idx} className="text-center hover:bg-gray-50 leading-none border-b border-black">
+              {/* İsim Sütunu (Kayıp olmaması için break-all) */}
+              <td className="border-2 border-black p-1.5 text-[7px] font-black text-left uppercase leading-tight break-all">
+                {student.full_name}
+              </td>
+              
+              <td className="border-2 border-black p-1 text-[8px] font-black text-center italic bg-gray-50/50">
+                {student.pre_test_score || "-"}
               </td>
               
               {student.weekly_breakdown.map((week, wIdx) => (
-                <td key={wIdx} className="border-2 border-black p-1 text-[6px] font-bold leading-none align-top">
-                  <div className="flex flex-col gap-1.5">
+                <td key={wIdx} className="border-2 border-black p-0.5 text-[5px] font-bold leading-none align-top overflow-hidden">
+                  <div className="flex flex-col gap-1">
                     {/* TUR 1 VERİLERİ */}
-                    <div className="flex flex-col border-b border-gray-300 pb-1 w-full items-center bg-blue-50/30">
-                      <div className="flex justify-between w-full px-1 mb-0.5">
-                        <span className="text-gray-500 font-black scale-[0.8]">T1</span>
+                    <div className="flex flex-col border-b border-gray-300 pb-0.5 w-full items-center bg-blue-50/10">
+                      <div className="flex justify-between w-full px-0.5 mb-0.5 scale-[0.85]">
+                        <span className="text-gray-400 font-black">T1</span>
                         <span className="text-blue-700 font-black">%{Math.round(week.progress)}</span>
                       </div>
                       <div className="flex flex-col items-center gap-0.5">
-                        <span className="text-[5px] text-gray-700">{week.correct}D / {week.wrong}Y</span>
-                        <span className="text-[5px] text-blue-600 font-black">{formatDuration(week.duration_seconds)}</span>
+                        <span className="text-[4px] text-gray-700">{week.correct}D / {week.wrong}Y</span>
+                        <span className="text-[4px] text-blue-600 font-black">{formatDuration(week.duration_seconds)}</span>
                       </div>
                     </div>
 
-                    {/* MATERYAL DETAYLARI */}
-                    <div className="flex flex-col gap-1 px-0.5">
-                      <p className="text-[4px] font-black text-gray-400 uppercase border-b border-gray-100 mb-1 text-left">Materyal Süreleri:</p>
+                    {/* MATERYALLER - Tüm liste korunuyor */}
+                    <div className="flex flex-col gap-0.5 px-0.5">
+                      <p className="text-[3.5px] font-black text-gray-400 uppercase border-b border-gray-50 mb-0.5 text-left">Materyaller:</p>
                       {week.material_details && week.material_details.length > 0 ? (
                         week.material_details.map((mat, mi) => (
-                          <div key={mi} className="flex justify-between items-start gap-1 text-[4.5px] text-gray-600 leading-[1.2] mb-0.5">
-                            <span className="text-left break-words w-20">• {mat.title}</span>
+                          <div key={mi} className="flex justify-between items-start gap-0.5 text-[4px] text-gray-600 leading-[1.1] mb-0.5">
+                            <span className="text-left break-words w-full">• {mat.title}</span>
                             <span className="font-black shrink-0 text-secondary">{formatDuration(mat.duration_seconds)}</span>
                           </div>
                         ))
                       ) : (
-                        <span className="text-[4px] text-gray-300 italic text-center">Aktivite Yok</span>
+                        <span className="text-[4px] text-gray-300 italic text-center">Yok</span>
                       )}
                     </div>
 
                     {/* TUR 2 VERİLERİ */}
                     {week.is_round_2_started ? (
-                      <div className="flex flex-col w-full items-center pt-1 border-t-2 border-amber-200 bg-amber-50/30 mt-auto">
-                        <span className="text-amber-600 font-black scale-[0.7]">T2 AKTİF</span>
-                        <span className="text-green-700 font-black">{week.correct_2}D / {week.wrong_2}Y</span>
-                        <span className="text-[5px] text-amber-700 font-bold">{formatDuration(week.duration_seconds_2)}</span>
+                      <div className="flex flex-col w-full items-center pt-0.5 border-t border-amber-200 bg-amber-50/30 mt-auto">
+                        <span className="text-amber-700 font-black scale-[0.6]">T2 AKTİF</span>
+                        <span className="text-green-700 font-black scale-[0.8]">{week.correct_2}D/{week.wrong_2}Y</span>
+                        <span className="text-[4px] text-amber-700 font-bold">{formatDuration(week.duration_seconds_2)}</span>
                       </div>
                     ) : null}
                   </div>
                 </td>
               ))}
 
-              <td className="border-2 border-black p-3 text-sm font-black text-blue-800 bg-gray-50">{student.total_points} P.</td>
-              <td className="border-2 border-black p-3 text-[9px] font-black leading-none bg-gray-50 italic">{formatDuration(student.total_time)}</td>
+              {/* BİRLEŞTİRİLMİŞ PUAN VE SÜRE */}
+              <td className="border-2 border-black p-1 bg-gray-100">
+                <div className="flex flex-col items-center justify-center gap-0.5">
+                   <span className="text-[9px] font-black text-blue-800 leading-none">{student.total_points} P.</span>
+                   <div className="w-full border-t border-black/20 my-1"></div>
+                   <span className="text-[7px] font-black italic text-gray-700 leading-none">{formatDuration(student.total_time)}</span>
+                </div>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -1507,93 +1535,156 @@ const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
         )}
 
         {/* --- SEKME 2: ÖĞRENCİ ANALİZLERİ --- */}
-        {activeTab === 'analytics' && (
-          <div className="animate-in slide-in-from-bottom-4 duration-500 space-y-6 md:space-y-8 pb-10 text-left">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-left">
-              <div className="flex items-center gap-6 leading-none">
-                <div className="bg-blue-50 p-4 rounded-2xl text-blue-600 flex items-center justify-center leading-none"><Users size={32} /></div>
-                <div className="text-left leading-none">
-                  <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-2 leading-none">Kayıtlı Öğrenci</p>
-                  <p className="text-3xl font-black">{filteredAnalytics.length}</p>
-                </div>
-              </div>
-              <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto leading-none text-left">
-                <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-xl border border-gray-200 text-left">
-                  <Filter size={16} className="text-gray-400" />
-                  <select value={selectedDepartment} onChange={(e) => setSelectedDepartment(e.target.value)} className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer">
-                    {departmentList.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <button onClick={handlePrintAcademic} className="flex items-center justify-center gap-3 bg-red-700 hover:bg-red-800 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all leading-none active:scale-95">
-                  <FileText size={18} /> {getDeptName(selectedDepartment).toUpperCase()} AKADEMİK RAPOR
-                </button>
-               
-              </div>
-            </div>
+{activeTab === 'analytics' && (
+  <div className="animate-in slide-in-from-bottom-4 duration-500 space-y-6 md:space-y-8 pb-10 text-left">
+    
+    {/* Üst Bilgi Kartı ve Filtreler */}
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-left">
+      <div className="flex items-center gap-6 leading-none">
+        <div className="bg-blue-50 p-4 rounded-2xl text-blue-600 flex items-center justify-center leading-none">
+          <Users size={32} />
+        </div>
+        <div className="text-left leading-none">
+          <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest mb-2 leading-none">Toplam Kayıtlı Öğrenci</p>
+          {/* totalCount state'ini kullanıyoruz, analytics.length sadece o sayfayı verir */}
+          <p className="text-3xl font-black">{totalCount || analytics.length}</p>
+        </div>
+      </div>
+      
+      <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto leading-none text-left">
+        <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-xl border border-gray-200 text-left">
+          <Filter size={16} className="text-gray-400" />
+          <select 
+            value={selectedDepartment} 
+            onChange={(e) => {
+              setSelectedDepartment(e.target.value);
+              setCurrentPage(1); // Bölüm değişince 1. sayfaya dön
+            }} 
+            className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer"
+          >
+            {departmentList.map(d => (
+              <option key={d.id} value={d.id}>{d.name}</option>
+            ))}
+          </select>
+        </div>
+        
+        <button onClick={handlePrintAcademic} className="flex items-center justify-center gap-3 bg-red-700 hover:bg-red-800 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all leading-none active:scale-95">
+          <FileText size={18} /> {getDeptName(selectedDepartment).toUpperCase()} AKADEMİK RAPOR
+        </button>
+      </div>
+    </div>
 
-            <div className="bg-white rounded-3xl md:rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden text-left">
-              <div className="p-6 md:p-8 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <BarChart3 size={18} className="text-[#ce1212]" />
-                  <h2 className="font-black text-secondary uppercase text-[10px] md:text-xs tracking-widest">Akademik Takip Çizelgesi</h2>
-                </div>
-              </div>
-              <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full text-left border-collapse min-w-[800px]">
-                  <thead>
-                    <tr className="bg-gray-100/50 text-gray-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest leading-none">
-                      <th className="p-5 md:p-8">AD SOYAD / BÖLÜM</th>
-                      <th className="p-5 md:p-8">PUAN / AKTİF İLERLEME</th>
-                      <th className="p-5 md:p-8">TOPLAM SÜRE</th>
-                      <th className="p-5 md:p-8 text-center">İŞLEM</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {filteredAnalytics.map((student) => (
-                      <tr key={student.id} className="hover:bg-gray-50/50 transition-all group">
-                        <td className="p-5 md:p-8">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 bg-secondary text-white rounded-full flex items-center justify-center font-bold text-xs shadow-md shrink-0 uppercase">{student.first_name[0]}{student.last_name[0]}</div>
-                            <div className="min-w-0 flex-1 leading-tight">
-                              <p className="font-black text-black text-sm truncate uppercase">{student.first_name} {student.last_name}</p>
-                              <p className="text-[9px] text-[#ce1212] font-black mt-1 uppercase">{getDeptName(student.department)}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-5 md:p-8">
-                          <div className="flex items-center gap-4">
-                            <div className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg font-black text-[10px] border border-amber-200 shadow-sm">{student.total_points} Puan</div>
-                            <div className="space-y-1.5 w-32">
-                              <div className="flex justify-between items-center leading-none">
-                                <span className="text-[10px] font-bold text-secondary">%{student.overall_progress}</span>
-                                <span className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">GÜNCEL</span>
-                              </div>
-                              <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden border shadow-inner">
-                                <div className={`h-full transition-all duration-1000 ${student.overall_progress === 100 ? 'bg-green-500' : 'bg-[#ce1212]'}`} style={{ width: `${student.overall_progress}%` }} />
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="p-5 md:p-8">
-                          <div className="flex items-center gap-2 text-gray-700 font-black text-xs md:text-sm">
-                            <Clock size={16} className="text-amber-500 shrink-0" /> {formatDuration(student.total_time_spent)}
-                          </div>
-                        </td>
-                        <td className="p-5 md:p-8 text-center">
-                          <button onClick={() => setSelectedStudent(student)} className="inline-flex items-center gap-2 text-[9px] font-black uppercase bg-secondary text-white px-5 py-2.5 rounded-xl hover:bg-black transition-all active:scale-95 shadow-md">
-                            <Search size={14} /> HAFTALIK KARNE
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+    {/* Analiz Tablosu */}
+    <div className="bg-white rounded-3xl md:rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden text-left">
+      <div className="p-6 md:p-8 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <BarChart3 size={18} className="text-[#ce1212]" />
+          <h2 className="font-black text-secondary uppercase text-[10px] md:text-xs tracking-widest">
+            Akademik Takip Çizelgesi (Sayfa {currentPage})
+          </h2>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto custom-scrollbar">
+        <table className="w-full text-left border-collapse min-w-[800px]">
+          <thead>
+            <tr className="bg-gray-100/50 text-gray-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest leading-none">
+              <th className="p-5 md:p-8">AD SOYAD / BÖLÜM</th>
+              <th className="p-5 md:p-8">PUAN / AKTİF İLERLEME</th>
+              <th className="p-5 md:p-8">TOPLAM SÜRE</th>
+              <th className="p-5 md:p-8 text-center">İŞLEM</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {analytics.length > 0 ? (
+              analytics.map((student) => (
+                <tr key={student.id} className="hover:bg-gray-50/50 transition-all group">
+                  <td className="p-5 md:p-8">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-secondary text-white rounded-full flex items-center justify-center font-bold text-xs shadow-md shrink-0 uppercase">
+                        {student.first_name?.[0]}{student.last_name?.[0]}
+                      </div>
+                      <div className="min-w-0 flex-1 leading-tight">
+                        <p className="font-black text-black text-sm truncate uppercase">{student.first_name} {student.last_name}</p>
+                        <p className="text-[9px] text-[#ce1212] font-black mt-1 uppercase">{getDeptName(student.department)}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-5 md:p-8">
+                    <div className="flex items-center gap-4">
+                      <div className="bg-amber-100 text-amber-700 px-3 py-1 rounded-lg font-black text-[10px] border border-amber-200 shadow-sm">{student.total_points} Puan</div>
+                      <div className="space-y-1.5 w-32">
+                        <div className="flex justify-between items-center leading-none">
+                          <span className="text-[10px] font-bold text-secondary">%{student.overall_progress}</span>
+                          <span className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">GÜNCEL</span>
+                        </div>
+                        <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden border shadow-inner">
+                          <div 
+                            className={`h-full transition-all duration-1000 ${student.overall_progress === 100 ? 'bg-green-500' : 'bg-[#ce1212]'}`} 
+                            style={{ width: `${student.overall_progress}%` }} 
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="p-5 md:p-8">
+                    <div className="flex items-center gap-2 text-gray-700 font-black text-xs md:text-sm">
+                      <Clock size={16} className="text-amber-500 shrink-0" /> 
+                      {/* Backend'den gelen hazır string'i kullanıyoruz veya formatlıyoruz */}
+                      {student.total_time_spent}
+                    </div>
+                  </td>
+                  <td className="p-5 md:p-8 text-center">
+                    <button 
+                      onClick={() => setSelectedStudent(student)} 
+                      className="inline-flex items-center gap-2 text-[9px] font-black uppercase bg-secondary text-white px-5 py-2.5 rounded-xl hover:bg-black transition-all active:scale-95 shadow-md"
+                    >
+                      <Search size={14} /> HAFTALIK KARNE
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="4" className="p-20 text-center text-gray-400 font-bold uppercase text-xs tracking-widest">
+                  {loading ? "Veriler Hazırlanıyor..." : "Bu bölümde öğrenci bulunamadı."}
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* --- SAYFALANDIRMA KONTROLLERİ --- */}
+      <div className="p-6 bg-gray-50 border-t border-gray-100 flex flex-col md:flex-row items-center justify-between gap-4">
+        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+          Toplam {totalCount} öğrenciden {analytics.length} tanesi gösteriliyor
+        </p>
+        <div className="flex items-center gap-2">
+          <button 
+            disabled={currentPage === 1 || loading}
+            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            className="p-3 rounded-xl bg-white border border-gray-200 shadow-sm text-secondary disabled:opacity-30 hover:bg-gray-100 transition-all active:scale-90"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          
+          <div className="bg-white border border-gray-200 px-6 py-2.5 rounded-xl shadow-sm text-[11px] font-black text-secondary">
+            SAYFA {currentPage}
           </div>
-        )}
+
+          <button 
+            disabled={analytics.length < 10 || loading} // 10'dan az veri varsa sonraki sayfa yoktur
+            onClick={() => setCurrentPage(prev => prev + 1)}
+            className="p-3 rounded-xl bg-white border border-gray-200 shadow-sm text-secondary disabled:opacity-30 hover:bg-gray-100 transition-all active:scale-90"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
 
        {/* --- SEKME 3: CHATBOT ANALİZİ --- */}
 {activeTab === 'chatbot' && (
