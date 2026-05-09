@@ -1646,7 +1646,7 @@ const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
               ))
             ) : (
               <tr>
-                <td colSpan="4" className="p-20 text-center text-gray-400 font-bold uppercase text-xs tracking-widest">
+                <td colSpan={4} className="p-20 text-center text-gray-400 font-bold uppercase text-xs tracking-widest">
                   {loading ? "Veriler Hazırlanıyor..." : "Bu bölümde öğrenci bulunamadı."}
                 </td>
               </tr>
