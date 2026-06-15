@@ -38,7 +38,7 @@ import {
   Bot,
   ChevronRight,
   ChevronLeft,
-  
+  PieChart
 } from 'lucide-react';
 
 // --- VERİ TİPİ TANIMLAMALARI ---
@@ -214,7 +214,10 @@ interface SurveyAnalysisResult {
 
 export default function TeacherDashboard() {
   // --- STATE YÖNETİMİ ---
-  const [activeTab, setActiveTab] = useState<'content' | 'analytics' | 'chatbot'>('content');  const [loading, setLoading] = useState(false);
+// --- STATE YÖNETİMİ ---
+  // Tek bir yerde güncellenmiş activeTab tipi
+  const [activeTab, setActiveTab] = useState<'content' | 'analytics' | 'chatbot' | 'survey_results'>('content');
+  const [loading, setLoading] = useState(false);
   const [fetchingWeek, setFetchingWeek] = useState(false);
   const [analytics, setAnalytics] = useState<StudentAnalytics[]>([]);
   const [bulkData, setBulkData] = useState<BulkStudentData[]>([]);
@@ -236,14 +239,102 @@ export default function TeacherDashboard() {
   const [entryQuestions, setEntryQuestions] = useState<EntryQuestion[]>([]);
 
   const [surveys, setSurveys] = useState<Survey[]>([]);
-  const [selectedSurveyId, setSelectedSurveyId] = useState<string>('1');
+  const [selectedSurveyId, setSelectedSurveyId] = useState<string>('4');
+  
+  // Anket sonuçlarını tutacak olan state (Mükerrerlikten temizlendi)
   const [surveyAnalysis, setSurveyAnalysis] = useState<SurveyAnalysisResult[]>([]);
+  
   const [isSurveyActive, setIsSurveyActive] = useState(false); // Bu hafta anket var mı?
   const [surveyQuestions, setSurveyQuestions] = useState<SurveyQuestion[]>([]);
   const [surveyTitle, setSurveyTitle] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0)
- 
+  const [totalCount, setTotalCount] = useState(0);
+
+/// =================================================================
+  // 1. ADIM: TÜM VERİ ÇEKME FONKSIYONLARI (ÜSTTE OLMALI)
+  // =================================================================
+
+  // --- 1. ÖĞRENCİ ANALİZLERİNİ ÇEKME ---
+  const fetchAnalytics = useCallback(async (page = 1) => {
+    if (!selectedDepartment || selectedDepartment === 'all') return;
+    setLoading(true);
+    setAnalytics([]); 
+    try {
+      const [res, bulkRes] = await Promise.all([
+        api.get(`/contents/analytics/?department=${selectedDepartment}&page=${page}`),
+        api.get(`/contents/bulk-academic-report/?department=${selectedDepartment}`)
+      ]);
+      
+      if (res.data && res.data.results) {
+        setAnalytics(res.data.results);
+        setTotalCount(res.data.count); 
+      } else {
+        setAnalytics(res.data);
+        if (Array.isArray(res.data)) {
+          setTotalCount(res.data.length);
+        }
+      }
+      setBulkData(bulkRes.data);
+    } catch (err) {
+      console.error("Analiz verileri yüklenemedi:", err);
+      setAnalytics([]); 
+      setBulkData([]);
+      setTotalCount(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedDepartment, setAnalytics, setBulkData, setTotalCount, setLoading]);
+
+// --- 2. CHATBOT ANALİZLERİNİ ÇEKME ---
+  const fetchChatbotAnalytics = useCallback(async () => {
+    if (!selectedDepartment || selectedDepartment === 'all') return;
+    setChatbotData([]);
+    try {
+      const res = await api.get(`/contents/chatbot-analytics/?department=${selectedDepartment}`);
+      setChatbotData(res.data);
+    } catch (err) {
+      console.error("Chatbot verileri yüklenemedi:", err);
+      setChatbotData([]);
+    }
+  }, [selectedDepartment, setChatbotData]);
+
+ // --- 3. ANKET ANALİZ SONUÇLARINI ÇEKME ---
+ // --- ANKET ANALİZ SONUÇLARINI BACKEND'DEN ÇEKME ---
+const fetchSurveyAnalytics = useCallback(async () => {
+  if (!selectedDepartment || selectedDepartment === 'all') return;
+  setLoading(true);
+  try {
+    // Doğrudan seçili anket ID'sini backend'e gönderiyoruz
+    const res = await api.get(`/contents/academic/surveys/report/?department=${selectedDepartment}&survey_id=${selectedSurveyId}`);
+    setSurveyAnalysis(res.data);
+  } catch (err) {
+    console.error("Anket analizleri çekilemedi:", err);
+    setSurveyAnalysis([]);
+  } finally {
+    setLoading(false);
+  }
+}, [selectedDepartment, selectedSurveyId, setSurveyAnalysis, setLoading]);
+
+  // =================================================================
+  // 2. ADIM: ANCAK HER ŞEY TANIMLANDIKTAN SONRA EFFECT TETİKLENMELİ
+  useEffect(() => {
+    if (!selectedDepartment || selectedDepartment === 'all') return;
+
+    if (activeTab === 'analytics') {
+      fetchAnalytics(currentPage);
+    }
+    if (activeTab === 'chatbot') {
+      fetchChatbotAnalytics();
+    }
+    if (activeTab === 'survey_results') {
+      fetchSurveyAnalytics(); 
+    }
+  }, [activeTab, selectedDepartment, currentPage, fetchAnalytics, fetchChatbotAnalytics, fetchSurveyAnalytics]);
+
+  // =================================================================
+  // 3. ADIM: ANKET HESAPLAMALARI VE YARDIMCI FONKSİYONLAR
+  // =================================================================
+
 
   // Yeni Soru Ekleme (İçinde boş şıklarla beraber)
 const addSurveyQuestion = () => {
@@ -475,42 +566,7 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
   }, [weekNumber, activeTab, fetchWeekDetail]);
 
 // --- ANALİZ VERİLERİNİ ÇEKME ---
-  const fetchAnalytics = useCallback(async (page = 1) => {
-    // Güvenlik: Departman seçili değilse veya 'all' ise istek atma
-    if (!selectedDepartment || selectedDepartment === 'all') return;
 
-    setLoading(true);
-    // Yeni veri gelene kadar eski verileri temizle
-    setAnalytics([]); 
-    // Not: Toplu rapor (bulkRes) genellikle sayfalandırılmaz, tüm bölümü kapsar.
-    // Ancak analytics (res) artık sayfalı geliyor.
-
-    try {
-      // Sayfa numarasını query param olarak ekliyoruz
-      const [res, bulkRes] = await Promise.all([
-        api.get(`/contents/analytics/?department=${selectedDepartment}&page=${page}`),
-        api.get(`/contents/bulk-academic-report/?department=${selectedDepartment}`)
-      ]);
-      
-      // KRİTİK: Backend artık { results: [], count: x } döndüğü için .results kullanıyoruz
-      if (res.data.results) {
-        setAnalytics(res.data.results);
-        // İstersen burada toplam sayfa sayısını hesaplamak için bir state güncelleyebilirsin:
-        // setTotalCount(res.data.count); 
-      } else {
-        // Eğer sayfalandırma bir şekilde kapalıysa eski uyumluluk için:
-        setAnalytics(res.data);
-      }
-
-      setBulkData(bulkRes.data);
-    } catch (err) {
-      console.error("Analiz verileri yüklenemedi:", err);
-      setAnalytics([]); 
-      setBulkData([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedDepartment]);
 
   // --- KRİTİK: BÖLÜM VEYA SAYFA DEĞİŞTİĞİNDE VERİYİ ÇEK ---
   useEffect(() => {
@@ -521,26 +577,7 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
     }
   }, [activeTab, selectedDepartment, currentPage, fetchAnalytics]);
 
-  const fetchChatbotAnalytics = useCallback(async () => {
-  if (!selectedDepartment || selectedDepartment === 'all') return;
-  setChatbotData([]);
-  
-  try {
-    const res = await api.get(`/contents/chatbot-analytics/?department=${selectedDepartment}`);
-    setChatbotData(res.data);
-  } catch (err) {
-    console.error("Chatbot verileri yüklenemedi:", err);
-  }
-}, [selectedDepartment]);
 
-useEffect(() => {
-  if (activeTab === 'analytics') {
-    fetchAnalytics();
-  }
-  if (activeTab === 'chatbot') {
-    fetchChatbotAnalytics(); // Chatbot sekmesine girince veriyi çek
-  }
-}, [activeTab, fetchAnalytics, fetchChatbotAnalytics]);
 
 const handlePrintChatbot = () => {
     // Akademik raporu tamamen gizle, chatbot raporunu göster
@@ -708,7 +745,24 @@ const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
     newCards[index] = { ...newCards[index], [field]: value };
     setFlashcards(newCards);
   };
+// --- YENİ: ANKET ANALİZ HESAPLAMALARI (KATEGORİ BAZLI GRUPLAMA) ---
+const surveyCategoryAverages = useMemo(() => {
+  const categories: { [key: string]: { total: number; count: number } } = {};
+  surveyAnalysis.forEach(item => {
+    const cat = item.category || "Genel Sorular";
+    if (!categories[cat]) {
+      categories[cat] = { total: 0, count: 0 };
+    }
+    categories[cat].total += item.answer;
+    categories[cat].count += 1;
+  });
 
+  return Object.keys(categories).map(key => ({
+    name: key,
+    average: Math.round(((categories[key].total / categories[key].count) + Number.EPSILON) * 100) / 100,
+    totalCount: categories[key].count
+  }));
+}, [surveyAnalysis]);
   // --- KAYDETME VE YAYINLAMA ---
  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1017,39 +1071,54 @@ const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
   ))}
 </div>
 
-      {/* ---------------------------------------------------------------- */}
-      {/* 2. NORMAL ARAYÜZ (HEADER) */}
-      {/* ---------------------------------------------------------------- */}
-      <header className="bg-[#1a1a1a] p-4 md:p-6 shadow-xl sticky top-0 z-50 print:hidden text-left border-b border-white/5">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6 text-left">
-          <div className="flex items-center gap-3 w-full md:w-auto text-left leading-none text-left">
-            <div className="bg-[#ce1212] p-2 rounded-lg shadow-lg shrink-0 text-left flex items-center justify-center">
-              <LayoutGrid size={24} className="text-white text-left" />
+     <header className="bg-[#1a1a1a] p-4 md:p-6 shadow-xl sticky top-0 z-50 print:hidden text-left border-b border-white/5">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row justify-between items-center gap-4 lg:gap-6 text-left">
+          
+          {/* LOGO ALANI */}
+          <div className="flex items-center gap-3 w-full lg:w-auto text-left leading-none shrink-0">
+            <div className="bg-[#ce1212] p-2 rounded-lg shadow-lg shrink-0 flex items-center justify-center">
+              <LayoutGrid size={24} className="text-white" />
             </div>
-            <div className="text-left leading-none text-left text-left">
-              <h1 className="text-lg md:text-xl font-black text-white uppercase leading-none text-left">Akademisyen Paneli</h1>
-              <p className="text-[9px] md:text-[10px] text-gray-400 uppercase tracking-widest leading-none text-left mt-1 font-bold">AKADEMİK YÖNETİM</p>
+            <div className="text-left leading-none">
+              <h1 className="text-lg md:text-xl font-black text-white uppercase leading-none">Akademisyen Paneli</h1>
+              <p className="text-[9px] md:text-[10px] text-gray-400 uppercase tracking-widest leading-none mt-1 font-bold">AKADEMİK YÖNETİM</p>
             </div>
           </div>
 
-          <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 w-full md:w-auto overflow-x-auto no-scrollbar leading-none text-left">
-            <button onClick={() => setActiveTab('content')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap leading-none ${activeTab === 'content' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
-              <Plus size={16} /> İÇERİK YÖNETİMİ
-            </button>
-            <button onClick={() => setActiveTab('analytics')} className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap leading-none ${activeTab === 'analytics' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>
-              <BarChart3 size={16} /> ÖĞRENCİ ANALİZLERİ
+          {/* MENÜ BUTONLARI KAPSAYICISI */}
+          {/* overflow ve scroll gizleme belasını kaldırdık, yerine esnek flex-wrap getirdik */}
+          <div className="flex flex-wrap bg-white/5 p-1 rounded-2xl border border-white/10 w-full lg:w-auto gap-1 justify-center leading-none text-left shrink-0">
+            <button 
+              onClick={() => setActiveTab('content')} 
+              className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 rounded-xl text-[11px] font-black transition-all whitespace-nowrap leading-none ${activeTab === 'content' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+            >
+              <Plus size={14} /> İÇERİK YÖNETİMİ
             </button>
             <button 
-  onClick={() => setActiveTab('chatbot')} 
-  className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap leading-none ${activeTab === 'chatbot' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
->
-  <Bot size={16} /> CHATBOT ANALİZİ
-</button>
+              onClick={() => setActiveTab('analytics')} 
+              className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 rounded-xl text-[11px] font-black transition-all whitespace-nowrap leading-none ${activeTab === 'analytics' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+            >
+              <BarChart3 size={14} /> ÖĞRENCİ ANALİZLERİ
+            </button>
+            <button 
+              onClick={() => setActiveTab('chatbot')} 
+              className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 rounded-xl text-[11px] font-black transition-all whitespace-nowrap leading-none ${activeTab === 'chatbot' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+            >
+              <Bot size={14} /> CHATBOT ANALİZİ
+            </button>
+            <button 
+              onClick={() => setActiveTab('survey_results')} 
+              className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 rounded-xl text-[11px] font-black transition-all whitespace-nowrap leading-none ${activeTab === 'survey_results' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+            >
+              <PieChart size={14} /> ANKET SONUÇLARI
+            </button>
           </div>
 
-          <button onClick={() => { localStorage.clear(); window.location.href = '/login'; }} className="w-full md:w-auto flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2 rounded-xl text-white font-bold text-[10px] uppercase leading-none transition-all active:scale-95 text-left shadow-sm">
+          {/* GÜVENLİ ÇIKIŞ BUTONU */}
+          <button onClick={() => { localStorage.clear(); window.location.href = '/login'; }} className="w-full lg:w-auto flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 px-4 py-2.5 rounded-xl text-white font-bold text-[10px] uppercase leading-none transition-all active:scale-95 text-left shadow-sm shrink-0">
             <LogOut size={16} /> GÜVENLİ ÇIKIŞ
           </button>
+          
         </div>
       </header>
 
@@ -1595,7 +1664,7 @@ const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
               <th className="p-5 md:p-8 text-center">İŞLEM</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-100 suppressHydrationWarning">
             {analytics.length > 0 ? (
               analytics.map((student) => (
                 <tr key={student.id} className="hover:bg-gray-50/50 transition-all group">
@@ -1795,6 +1864,294 @@ const setCorrectEntryOption = (qIdx: number, oIdx: number) => {
         </table>
       </div>
     </div>
+  </div>
+)}
+{/* --- SEKME 4: ANKET / ÖLÇEK SONUÇLARI VE STANDART GRAFİKLER --- */}
+{activeTab === 'survey_results' && (
+  <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 space-y-6">
+    
+    {/* ÜST SEÇİM KONTROLÜ VE ANKET BAZLI FİLTRELER */}
+    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-left">
+      <div className="text-left leading-none">
+        <h2 className="text-xl font-black text-purple-950 uppercase leading-none border-l-4 border-purple-600 pl-3">Bilimsel Ölçek Yanıt Analizleri</h2>
+        <p className="text-[10px] text-gray-400 font-bold uppercase mt-2 tracking-widest italic leading-none">Anket Bazlı Kategori Ortalamaları ve Likert Dağılımları</p>
+      </div>
+      
+      <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+        {/* Departman Filtresi */}
+        <div className="flex-1 md:flex-none flex items-center gap-2 bg-gray-50 px-4 py-2.5 rounded-xl border border-gray-200 text-left shadow-inner">
+          <Filter size={16} className="text-purple-600" />
+          <select 
+            value={selectedDepartment} 
+            onChange={(e) => setSelectedDepartment(e.target.value)} 
+            className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer text-purple-950 w-full font-black"
+          >
+            {Array.isArray(departmentList) && departmentList.map(d => (
+              <option key={d.id} value={d.id} className="text-black">{d.name}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Anket Seçim Filtresi */}
+        <div className="flex-1 md:flex-none flex items-center gap-2 bg-gray-50 px-4 py-2.5 rounded-xl border border-gray-200 text-left shadow-inner">
+          <ListChecks size={16} className="text-purple-600" />
+          <select 
+            value={selectedSurveyId} 
+            onChange={(e) => setSelectedSurveyId(e.target.value)} 
+            className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer text-purple-950 w-full font-black"
+          >
+            <option value="4" className="text-black">4. HAFTA UYUM ÖLÇEĞİ</option>
+            <option value="5" className="text-black">5. HAFTA DEĞERLENDİRME ANKETİ</option>
+            <option value="6" className="text-black">6. HAFTA ÖĞRENME ANKETİ</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    {/* İSTATİSTİK PANELİ VE HESAPLAMA BLOĞU */}
+    {(() => {
+      // Güvenli dizi kalkanı
+      const surveyDataArray = Array.isArray(surveyAnalysis) ? surveyAnalysis : [];
+      const totalResponses = surveyDataArray.length;
+      
+      // Puan toplama ve sayısal doğrulama kalkanı (Yorum satırı hatası düzeltildi)
+      const totalScore = surveyDataArray.reduce((acc: number, curr: any) => {
+        const val = Number(curr.answer);
+        return acc + (!isNaN(val) ? val : 0);
+      }, 0);
+      
+      const generalAverage = totalResponses > 0 ? (Math.round((totalScore / totalResponses) * 100) / 100) : 0;
+      const dynamicPercentage = totalResponses > 0 ? Math.round((generalAverage / 5) * 100) : 0;
+
+      // Şıkların Sayım Havuzu
+      const answerCounts: { [key: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      
+      // Hem üst tarafta hem alt tarafta kullanılacak dinamik havuz (DB boşsa fallback olur)
+      const dynamicLikertLabels: { [key: number]: string } = {
+        1: "Hiçbir zaman",
+        2: "Ender olarak",
+        3: "Bazen",
+        4: "Sıklıkla",
+        5: "Her zaman"
+      };
+
+      // Döngü içinde hem sayıları topluyoruz hem de en güncel dinamik metni yakalıyoruz
+      surveyDataArray.forEach((item: any) => {
+        const numAnswer = Number(item.answer);
+        if (numAnswer && answerCounts[numAnswer] !== undefined) {
+          answerCounts[numAnswer]++;
+          
+          // Gelen metin geçerliyse üst kartları besleyen objeyi anlık güncelle
+          const isTextClean = item.answer_text && 
+                               !item.answer_text.includes("Hata") && 
+                               item.answer_text !== "null" && 
+                               item.answer_text.trim() !== "";
+                               
+          if (isTextClean) {
+            dynamicLikertLabels[numAnswer] = item.answer_text;
+          }
+        }
+      });
+
+      // Kategori bazlı barların anlık gruplanması
+      const localCategories: { [key: string]: { total: number; count: number } } = {};
+      surveyDataArray.forEach((item: any) => {
+        const cat = item.category || "Genel";
+        if (!localCategories[cat]) {
+          localCategories[cat] = { total: 0, count: 0 };
+        }
+        const val = Number(item.answer);
+        localCategories[cat].total += !isNaN(val) ? val : 0;
+        localCategories[cat].count += 1;
+      });
+
+      const localCategoryAverages = Object.keys(localCategories).map(key => {
+        const count = localCategories[key].count;
+        const total = localCategories[key].total;
+        return {
+          name: key,
+          average: count > 0 ? Math.round((total / count) * 100) / 100 : 0,
+          totalCount: count
+        };
+      });
+
+      return (
+        <>
+          {/* ÜST İSTATİSTİK KARTLARI VE KİLİTLENMEYEN SAF TAILWIND GRAFİĞİ */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Kart 1: Toplam Yanıt */}
+            <div className="bg-gradient-to-br from-purple-900 to-indigo-950 p-6 rounded-3xl shadow-xl text-white text-left flex flex-col justify-between">
+              <div>
+                <p className="text-[9px] font-black tracking-widest text-purple-300 uppercase">Anket Toplam Verisi</p>
+                <h3 className="text-3xl font-black mt-2">{totalResponses} <span className="text-xs font-normal text-purple-300">Yanıt Maddesi</span></h3>
+              </div>
+              <p className="text-[9px] text-purple-200/60 font-medium mt-4">Bu ankete ait veri tabanında işlenen aktif satır sayısı.</p>
+            </div>
+
+            {/* KART 2: SAF TAILWIND GRAFİK KARTI */}
+            <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 flex flex-col justify-between text-left gap-4">
+              <div>
+                <p className="text-[9px] font-black tracking-widest text-gray-400 uppercase">Ölçek Genel Başarı Oranı</p>
+                <h4 className="text-base font-black text-purple-950 uppercase leading-none mt-1">Anket Memnuniyet Oranı</h4>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between items-center text-xs font-black text-purple-950">
+                  <span>Skor Etki Yoğunluğu</span>
+                  <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md">%{dynamicPercentage}</span>
+                </div>
+                <div className="w-full bg-gray-100 h-4 rounded-full overflow-hidden p-0.5 border shadow-inner">
+                  <div 
+                    className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full transition-all duration-500 shadow-md"
+                    style={{ width: `${totalResponses > 0 ? dynamicPercentage : 0}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Kart 3: Ortalama Başarı Skoru */}
+            <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-left flex flex-col justify-between">
+              <div>
+                <p className="text-[9px] font-black tracking-widest text-gray-400 uppercase">Anket Genel Skor Ortalaması</p>
+                <h3 className="text-3xl font-black text-green-600 mt-2">
+                  {generalAverage} <span className="text-xs font-normal text-gray-400">/ 5.00</span>
+                </h3>
+              </div>
+              <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden mt-4">
+                <div 
+                  className="h-full bg-green-500 transition-all duration-500" 
+                  style={{ width: `${totalResponses > 0 ? (generalAverage / 5) * 100 : 0}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ŞIKLARIN METİNSEL DAĞILIM PANELİ (ARTIK ÜST TARAF DA TAMAMEN ANKETE GÖRE DİNAMİK) */}
+          <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-left">
+            <h3 className="text-xs font-black text-purple-950 uppercase tracking-widest mb-4 border-l-4 border-indigo-500 pl-2">
+              Verilen Yanıtların Şıklara Göre Dağılım Metinleri (Ölçek Formatlı)
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+              {[5, 4, 3, 2, 1].map((val) => {
+                const count = answerCounts[val] || 0;
+                const pct = totalResponses > 0 ? Math.round((count / totalResponses) * 100) : 0;
+                return (
+                  <div key={val} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col justify-between min-h-[95px]">
+                    <div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs font-black text-purple-950">{val} Puan</span>
+                        <span className="text-[9px] font-black bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">%{pct}</span>
+                      </div>
+                      <p className="text-[10px] text-gray-500 font-bold mt-1 leading-tight min-h-[24px]">
+                        {dynamicLikertLabels[val]}
+                      </p>
+                    </div>
+                    <p className="text-[11px] font-black text-purple-950 mt-2 border-t pt-1 border-gray-200/60">
+                      {count} <span className="text-[9px] font-normal text-gray-400">Öğrenci</span>
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* DETAYLI VERİ TABLO ALANI */}
+          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden text-left">
+            <div className="p-6 border-b bg-purple-50/20 flex justify-between items-center">
+              <h2 className="font-black text-purple-950 uppercase text-xs tracking-widest flex items-center gap-2 leading-none">
+                <ListChecks size={18} className="text-purple-600" /> Öğrenci Bazlı Ölçek Veritabanı Maddeleri
+              </h2>
+            </div>
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse min-w-[800px]">
+                <thead className="bg-purple-950 text-white text-[10px] font-black uppercase tracking-widest leading-none">
+                  <tr>
+                    <th className="p-6 w-1/4">ÖĞRENCİ BİLGİSİ</th>
+                    <th className="p-6 w-1/3">SORU MADDESİ</th>
+                    <th className="p-6 w-1/4">KATEGORİ</th>
+                    <th className="p-6 text-center w-32">VERİLEN PUAN / ŞIK</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 font-bold">
+                  {totalResponses > 0 ? (
+                    surveyDataArray.map((item: any, si: number) => {
+                      const finalScore = Number(item.answer) || 0;
+                      
+                      const isTextValid = item.answer_text && 
+                                          !item.answer_text.includes("Hata") && 
+                                          item.answer_text !== "null" && 
+                                          item.answer_text.trim() !== "";
+                      
+                      const displayLabel = isTextValid ? item.answer_text : (dynamicLikertLabels[finalScore] || `${finalScore} Puan`);
+
+                      return (
+                        <tr key={si} className="hover:bg-purple-50/20 transition-all">
+                          <td className="p-5 text-sm uppercase text-black font-black truncate">{item.student || "Bilinmeyen Öğrenci"}</td>
+                          <td className="p-5 text-xs text-gray-600 font-medium leading-relaxed">&quot;{item.question || "Soru Maddesi Eksik"}&quot;</td>
+                          <td className="p-5">
+                            <span className="bg-purple-100/60 text-purple-700 px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest">{item.category || "Genel"}</span>
+                          </td>
+                          <td className="p-5 text-center">
+                            <span className="bg-purple-600 text-white px-3 py-2 rounded-xl text-xs font-black shadow-md block w-fit mx-auto whitespace-nowrap">
+                              {finalScore} Puan ({displayLabel})
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="p-16 text-center text-gray-400 font-black uppercase text-xs tracking-widest">
+                        {loading ? "Analizler İşleniyor..." : "Veri tabanında eşleşen veri bulunamadı."}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* KATEGORİ BAZLI LİKERT İLERLEME BARLARI */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {localCategoryAverages.length > 0 ? (
+              localCategoryAverages.map((cat, ci) => (
+                <div key={ci} className="bg-white p-6 rounded-3xl shadow-xl border-l-[10px] border-purple-600 flex flex-col justify-between gap-6 text-left">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="text-left">
+                      <span className="text-gray-400 text-[9px] font-black uppercase tracking-widest block mb-1">Alt Boyut / Kategori</span>
+                      <h4 className="text-base font-black text-purple-950 uppercase tracking-tight leading-tight">{cat.name}</h4>
+                    </div>
+                    <div className="bg-purple-50 text-purple-700 px-4 py-2 rounded-2xl text-center shadow-sm shrink-0">
+                      <p className="text-[8px] font-bold uppercase text-gray-400 leading-none mb-1">Ortalama</p>
+                      <p className="text-xl font-black leading-none text-purple-950">{cat.average} <span className="text-[10px] text-gray-400 font-normal">/ 5</span></p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-[10px] font-black uppercase">
+                      <span className="text-gray-400">Ölçek Skor Dağılım Grafiği</span>
+                      <span className="text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md">%{Math.round((cat.average / 5) * 100)} Yoğunluk</span>
+                    </div>
+                    <div className="w-full bg-gray-100 h-4 rounded-full overflow-hidden p-0.5 border shadow-inner flex">
+                      <div 
+                        className="h-full bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-700 rounded-full transition-all duration-500 shadow-md"
+                        style={{ width: `${cat.totalCount > 0 ? (cat.average / 5) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[8px] text-gray-400 font-black uppercase tracking-wider">
+                      <span>Hiçbir zaman (1)</span>
+                      <span>Örneklem: {cat.totalCount} Soru Verisi</span>
+                      <span>Her zaman (5)</span>
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : null}
+          </div>
+        </>
+      );
+    })()}
+
   </div>
 )}
       </main>
