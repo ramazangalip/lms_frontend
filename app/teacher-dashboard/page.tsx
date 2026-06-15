@@ -1874,7 +1874,7 @@ const surveyCategoryAverages = useMemo(() => {
     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-left">
       <div className="text-left leading-none">
         <h2 className="text-xl font-black text-purple-950 uppercase leading-none border-l-4 border-purple-600 pl-3">Bilimsel Ölçek Yanıt Analizleri</h2>
-        <p className="text-[10px] text-gray-400 font-bold uppercase mt-2 tracking-widest italic leading-none">Anket Bazlı Kategori Ortalamaları ve Likert Dağılımları</p>
+        <p className="text-[10px] text-gray-400 font-bold uppercase mt-2 tracking-widest italic leading-none">Soru Maddesi Bazlı Dinamik Likert Dağılım Grafikleri</p>
       </div>
       
       <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
@@ -1910,11 +1910,9 @@ const surveyCategoryAverages = useMemo(() => {
 
     {/* İSTATİSTİK PANELİ VE HESAPLAMA BLOĞU */}
     {(() => {
-      // Güvenli dizi kalkanı
       const surveyDataArray = Array.isArray(surveyAnalysis) ? surveyAnalysis : [];
       const totalResponses = surveyDataArray.length;
       
-      // Puan toplama ve sayısal doğrulama kalkanı (Yorum satırı hatası düzeltildi)
       const totalScore = surveyDataArray.reduce((acc: number, curr: any) => {
         const val = Number(curr.answer);
         return acc + (!isNaN(val) ? val : 0);
@@ -1923,11 +1921,8 @@ const surveyCategoryAverages = useMemo(() => {
       const generalAverage = totalResponses > 0 ? (Math.round((totalScore / totalResponses) * 100) / 100) : 0;
       const dynamicPercentage = totalResponses > 0 ? Math.round((generalAverage / 5) * 100) : 0;
 
-      // Şıkların Sayım Havuzu
-      const answerCounts: { [key: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-      
-      // Hem üst tarafta hem alt tarafta kullanılacak dinamik havuz (DB boşsa fallback olur)
-      const dynamicLikertLabels: { [key: number]: string } = {
+      // Koruma Kalkanı Statik Başlıkları
+      const fallbackLabels: { [key: number]: string } = {
         1: "Hiçbir zaman",
         2: "Ender olarak",
         3: "Bazen",
@@ -1935,51 +1930,50 @@ const surveyCategoryAverages = useMemo(() => {
         5: "Her zaman"
       };
 
-      // Döngü içinde hem sayıları topluyoruz hem de en güncel dinamik metni yakalıyoruz
+      // --- MUCİZEVİ SORU BAZLI GRUPLAMA ALGORİTMASI ---
+      const questionsMap: { [key: string]: { 
+        questionText: string; 
+        category: string;
+        responsesCount: number;
+        counts: { [key: number]: number }; 
+        labels: { [key: number]: string }; 
+      }} = {};
+
       surveyDataArray.forEach((item: any) => {
-        const numAnswer = Number(item.answer);
-        if (numAnswer && answerCounts[numAnswer] !== undefined) {
-          answerCounts[numAnswer]++;
+        const qText = item.question || "Soru Maddesi Eksik";
+        const finalScore = Number(item.answer) || 0;
+        const cat = item.category || "Genel";
+
+        if (!questionsMap[qText]) {
+          questionsMap[qText] = {
+            questionText: qText,
+            category: cat,
+            responsesCount: 0,
+            counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+            labels: { ...fallbackLabels }
+          };
+        }
+
+        if (finalScore >= 1 && finalScore <= 5) {
+          questionsMap[qText].counts[finalScore]++;
+          questionsMap[qText].responsesCount++;
           
-          // Gelen metin geçerliyse üst kartları besleyen objeyi anlık güncelle
           const isTextClean = item.answer_text && 
                                !item.answer_text.includes("Hata") && 
                                item.answer_text !== "null" && 
                                item.answer_text.trim() !== "";
-                               
           if (isTextClean) {
-            dynamicLikertLabels[numAnswer] = item.answer_text;
+            questionsMap[qText].labels[finalScore] = item.answer_text;
           }
         }
       });
 
-      // Kategori bazlı barların anlık gruplanması
-      const localCategories: { [key: string]: { total: number; count: number } } = {};
-      surveyDataArray.forEach((item: any) => {
-        const cat = item.category || "Genel";
-        if (!localCategories[cat]) {
-          localCategories[cat] = { total: 0, count: 0 };
-        }
-        const val = Number(item.answer);
-        localCategories[cat].total += !isNaN(val) ? val : 0;
-        localCategories[cat].count += 1;
-      });
-
-      const localCategoryAverages = Object.keys(localCategories).map(key => {
-        const count = localCategories[key].count;
-        const total = localCategories[key].total;
-        return {
-          name: key,
-          average: count > 0 ? Math.round((total / count) * 100) / 100 : 0,
-          totalCount: count
-        };
-      });
+      const groupedQuestions = Object.values(questionsMap);
 
       return (
         <>
-          {/* ÜST İSTATİSTİK KARTLARI VE KİLİTLENMEYEN SAF TAILWIND GRAFİĞİ */}
+          {/* ÜST PANEL: GENEL DURUM KARTLARI */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Kart 1: Toplam Yanıt */}
             <div className="bg-gradient-to-br from-purple-900 to-indigo-950 p-6 rounded-3xl shadow-xl text-white text-left flex flex-col justify-between">
               <div>
                 <p className="text-[9px] font-black tracking-widest text-purple-300 uppercase">Anket Toplam Verisi</p>
@@ -1988,17 +1982,15 @@ const surveyCategoryAverages = useMemo(() => {
               <p className="text-[9px] text-purple-200/60 font-medium mt-4">Bu ankete ait veri tabanında işlenen aktif satır sayısı.</p>
             </div>
 
-            {/* KART 2: SAF TAILWIND GRAFİK KARTI */}
             <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 flex flex-col justify-between text-left gap-4">
               <div>
                 <p className="text-[9px] font-black tracking-widest text-gray-400 uppercase">Ölçek Genel Başarı Oranı</p>
                 <h4 className="text-base font-black text-purple-950 uppercase leading-none mt-1">Anket Memnuniyet Oranı</h4>
               </div>
-              
               <div className="space-y-2">
                 <div className="flex justify-between items-center text-xs font-black text-purple-950">
                   <span>Skor Etki Yoğunluğu</span>
-                  <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-md">%{dynamicPercentage}</span>
+                  <span>%{dynamicPercentage}</span>
                 </div>
                 <div className="w-full bg-gray-100 h-4 rounded-full overflow-hidden p-0.5 border shadow-inner">
                   <div 
@@ -2009,7 +2001,6 @@ const surveyCategoryAverages = useMemo(() => {
               </div>
             </div>
 
-            {/* Kart 3: Ortalama Başarı Skoru */}
             <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-left flex flex-col justify-between">
               <div>
                 <p className="text-[9px] font-black tracking-widest text-gray-400 uppercase">Anket Genel Skor Ortalaması</p>
@@ -2026,33 +2017,63 @@ const surveyCategoryAverages = useMemo(() => {
             </div>
           </div>
 
-          {/* ŞIKLARIN METİNSEL DAĞILIM PANELİ (ARTIK ÜST TARAF DA TAMAMEN ANKETE GÖRE DİNAMİK) */}
-          <div className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-left">
-            <h3 className="text-xs font-black text-purple-950 uppercase tracking-widest mb-4 border-l-4 border-indigo-500 pl-2">
-              Verilen Yanıtların Şıklara Göre Dağılım Metinleri (Ölçek Formatlı)
+          {/* HOCANIN TAM İSTEDİĞİ YER: SORU BAZLI AYRI AYRI YÜZDELİK GRAFİK LİSTESİ */}
+          <div className="space-y-6">
+            <h3 className="text-sm font-black text-purple-950 uppercase tracking-widest text-left border-l-4 border-purple-600 pl-2">
+              Maddelere Göre Soru Bazlı Yüzdelik Likert Dağılımları
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
-              {[5, 4, 3, 2, 1].map((val) => {
-                const count = answerCounts[val] || 0;
-                const pct = totalResponses > 0 ? Math.round((count / totalResponses) * 100) : 0;
-                return (
-                  <div key={val} className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex flex-col justify-between min-h-[95px]">
-                    <div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs font-black text-purple-950">{val} Puan</span>
-                        <span className="text-[9px] font-black bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">%{pct}</span>
-                      </div>
-                      <p className="text-[10px] text-gray-500 font-bold mt-1 leading-tight min-h-[24px]">
-                        {dynamicLikertLabels[val]}
-                      </p>
-                    </div>
-                    <p className="text-[11px] font-black text-purple-950 mt-2 border-t pt-1 border-gray-200/60">
-                      {count} <span className="text-[9px] font-normal text-gray-400">Öğrenci</span>
-                    </p>
+            
+            {groupedQuestions.length > 0 ? (
+              groupedQuestions.map((q, qi) => (
+                <div key={qi} className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-left space-y-4">
+                  {/* Soru Başlığı ve Kategorisi */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                    <h4 className="text-sm font-black text-purple-950 leading-snug">
+                      {qi + 1}. &quot;{q.questionText}&quot;
+                    </h4>
+                    <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest self-start sm:self-center">
+                      {q.category}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
+
+                  {/* Soruya Ait 5 Ayrı Likert Çubuğu */}
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {[5, 4, 3, 2, 1].map((score) => {
+                      const count = q.counts[score] || 0;
+                      const pct = q.responsesCount > 0 ? Math.round((count / q.responsesCount) * 100) : 0;
+                      const currentLabel = q.labels[score] || fallbackLabels[score];
+
+                      return (
+                        <div key={score} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-gray-50/50 p-2.5 rounded-xl border border-gray-100/50 hover:bg-purple-50/10 transition-all">
+                          {/* Şık ve Şık Metni */}
+                          <div className="sm:w-44 shrink-0 text-left leading-tight">
+                            <span className="text-xs font-black text-purple-950 block">{score} Puan</span>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase truncate block">{currentLabel}</span>
+                          </div>
+                          
+                          {/* Saf Çubuk Grafik */}
+                          <div className="flex-1 bg-gray-200 h-3.5 rounded-full overflow-hidden p-0.5 shadow-inner">
+                            <div 
+                              className="h-full bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full transition-all duration-700 ease-out"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+
+                          {/* İstatistik Göstergesi */}
+                          <div className="sm:w-28 text-right font-black shrink-0 text-xs text-purple-950 leading-none">
+                            %{pct} <span className="text-[10px] text-gray-400 font-normal">({count} Öğrenci)</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="bg-white p-8 text-center text-gray-400 rounded-3xl border border-dashed font-bold uppercase text-xs">
+                Soru bazlı analiz oluşturulacak veri bulunamadı.
+              </div>
+            )}
           </div>
 
           {/* DETAYLI VERİ TABLO ALANI */}
@@ -2076,13 +2097,12 @@ const surveyCategoryAverages = useMemo(() => {
                   {totalResponses > 0 ? (
                     surveyDataArray.map((item: any, si: number) => {
                       const finalScore = Number(item.answer) || 0;
-                      
                       const isTextValid = item.answer_text && 
                                           !item.answer_text.includes("Hata") && 
                                           item.answer_text !== "null" && 
                                           item.answer_text.trim() !== "";
                       
-                      const displayLabel = isTextValid ? item.answer_text : (dynamicLikertLabels[finalScore] || `${finalScore} Puan`);
+                      const displayLabel = isTextValid ? item.answer_text : (fallbackLabels[finalScore] || `${finalScore} Puan`);
 
                       return (
                         <tr key={si} className="hover:bg-purple-50/20 transition-all">
@@ -2109,44 +2129,6 @@ const surveyCategoryAverages = useMemo(() => {
                 </tbody>
               </table>
             </div>
-          </div>
-
-          {/* KATEGORİ BAZLI LİKERT İLERLEME BARLARI */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {localCategoryAverages.length > 0 ? (
-              localCategoryAverages.map((cat, ci) => (
-                <div key={ci} className="bg-white p-6 rounded-3xl shadow-xl border-l-[10px] border-purple-600 flex flex-col justify-between gap-6 text-left">
-                  <div className="flex justify-between items-start gap-4">
-                    <div className="text-left">
-                      <span className="text-gray-400 text-[9px] font-black uppercase tracking-widest block mb-1">Alt Boyut / Kategori</span>
-                      <h4 className="text-base font-black text-purple-950 uppercase tracking-tight leading-tight">{cat.name}</h4>
-                    </div>
-                    <div className="bg-purple-50 text-purple-700 px-4 py-2 rounded-2xl text-center shadow-sm shrink-0">
-                      <p className="text-[8px] font-bold uppercase text-gray-400 leading-none mb-1">Ortalama</p>
-                      <p className="text-xl font-black leading-none text-purple-950">{cat.average} <span className="text-[10px] text-gray-400 font-normal">/ 5</span></p>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center text-[10px] font-black uppercase">
-                      <span className="text-gray-400">Ölçek Skor Dağılım Grafiği</span>
-                      <span className="text-purple-600 bg-purple-50 px-2 py-0.5 rounded-md">%{Math.round((cat.average / 5) * 100)} Yoğunluk</span>
-                    </div>
-                    <div className="w-full bg-gray-100 h-4 rounded-full overflow-hidden p-0.5 border shadow-inner flex">
-                      <div 
-                        className="h-full bg-gradient-to-r from-purple-500 via-indigo-500 to-purple-700 rounded-full transition-all duration-500 shadow-md"
-                        style={{ width: `${cat.totalCount > 0 ? (cat.average / 5) * 100 : 0}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-[8px] text-gray-400 font-black uppercase tracking-wider">
-                      <span>Hiçbir zaman (1)</span>
-                      <span>Örneklem: {cat.totalCount} Soru Verisi</span>
-                      <span>Her zaman (5)</span>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : null}
           </div>
         </>
       );
