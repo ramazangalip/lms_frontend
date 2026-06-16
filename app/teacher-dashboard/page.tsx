@@ -1900,9 +1900,9 @@ const surveyCategoryAverages = useMemo(() => {
             onChange={(e) => setSelectedSurveyId(e.target.value)} 
             className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer text-purple-950 w-full font-black"
           >
-            <option value="4" className="text-black">4. HAFTA UYUM ÖLÇEĞİ</option>
-            <option value="5" className="text-black">5. HAFTA DEĞERLENDİRME ANKETİ</option>
-            <option value="6" className="text-black">6. HAFTA ÖĞRENME ANKETİ</option>
+            <option value="4" className="text-black">4. HAFTA Öz Düzenlemeli Öğrenme Becerileri Ölçeği</option>
+            <option value="5" className="text-black">5. HAFTA Bilgisayar Destekli Eğitim Yapmaya İlişkin Tutum Ölçeği</option>
+            <option value="6" className="text-black">6. HAFTA Çevrimiçi Öğrenmeye Yönelik Hazır Bulunuşluk Ölçeği</option>
           </select>
         </div>
       </div>
