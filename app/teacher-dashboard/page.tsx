@@ -1921,7 +1921,8 @@ const surveyCategoryAverages = useMemo(() => {
       const generalAverage = totalResponses > 0 ? (Math.round((totalScore / totalResponses) * 100) / 100) : 0;
       const dynamicPercentage = totalResponses > 0 ? Math.round((generalAverage / 5) * 100) : 0;
 
-      // Koruma Kalkanı Statik Başlıkları
+      const answerCounts: { [key: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      
       const fallbackLabels: { [key: number]: string } = {
         1: "Hiçbir zaman",
         2: "Ender olarak",
@@ -1930,7 +1931,9 @@ const surveyCategoryAverages = useMemo(() => {
         5: "Her zaman"
       };
 
-      // --- MUCİZEVİ SORU BAZLI GRUPLAMA ALGORİTMASI ---
+      const dynamicLikertLabels: { [key: number]: string } = { ...fallbackLabels };
+
+      // Soru bazlı gruplama haritası mimarisi
       const questionsMap: { [key: string]: { 
         questionText: string; 
         category: string;
@@ -1957,12 +1960,14 @@ const surveyCategoryAverages = useMemo(() => {
         if (finalScore >= 1 && finalScore <= 5) {
           questionsMap[qText].counts[finalScore]++;
           questionsMap[qText].responsesCount++;
+          answerCounts[finalScore]++;
           
           const isTextClean = item.answer_text && 
                                !item.answer_text.includes("Hata") && 
                                item.answer_text !== "null" && 
                                item.answer_text.trim() !== "";
           if (isTextClean) {
+            dynamicLikertLabels[finalScore] = item.answer_text;
             questionsMap[qText].labels[finalScore] = item.answer_text;
           }
         }
@@ -1970,9 +1975,78 @@ const surveyCategoryAverages = useMemo(() => {
 
       const groupedQuestions = Object.values(questionsMap);
 
+      // --- %100 GÜVENLİ TÜRKÇE KARAKTER DESTEKLİ PDF DETAY MOTORU ---
+      const handlePDFExport = async () => {
+        const { jsPDF } = await import('jspdf');
+        const autoTable = (await import('jspdf-autotable')).default;
+        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+        
+        // PDF Tablolarındaki Türkçe Karakter Hatalarını Çözen Filtre
+        const fixTR = (str: string) => {
+          if (!str) return "";
+          return str
+            .replace(/ı/g, "i").replace(/ş/g, "s").replace(/ğ/g, "g")
+            .replace(/ç/g, "c").replace(/ö/g, "o").replace(/ü/g, "u")
+            .replace(/İ/g, "I").replace(/Ş/g, "S").replace(/Ğ/g, "G")
+            .replace(/Ç/g, "C").replace(/Ö/g, "O").replace(/Ü/g, "U");
+        };
+
+        doc.setFont("Helvetica", "bold");
+        doc.setFillColor(67, 24, 108); // Kurumsal Koyu Mor Renk Kodun
+        doc.rect(0, 0, 210, 25, "F");
+        
+  
+        
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(13);
+        doc.text("AKADEMIK OLCEK VE ANKET ANALIZ RAPORU", 30, 15);
+        
+        // Metrik Özet Alanları
+        doc.setTextColor(40, 40, 40);
+        doc.setFontSize(10);
+        doc.setFont("Helvetica", "normal");
+        doc.text(fixTR(`Rapor Tarihi: ${new Date().toLocaleDateString('tr-TR')}`), 15, 35);
+        doc.text(fixTR(`Toplam Örneklem: ${totalResponses} Yanıt Maddesi`), 15, 41);
+        doc.text(fixTR(`Genel Skor Ortalaması: ${generalAverage} / 5.00  (%${dynamicPercentage} Başarı)`), 15, 47);
+        
+        doc.setDrawColor(220, 220, 220);
+        doc.line(15, 52, 195, 52);
+        
+        doc.setFont("Helvetica", "bold");
+        doc.setFontSize(11);
+        doc.text(fixTR("Soru Maddeleri Yoğunluk Analiz Dağılımları"), 15, 59);
+        
+        const rows = groupedQuestions.map((q, idx) => [
+          fixTR(`${idx + 1}. ${q.questionText}`),
+          `%${q.responsesCount > 0 ? Math.round((q.counts[5] / q.responsesCount) * 100) : 0} (${q.counts[5]})`,
+          `%${q.responsesCount > 0 ? Math.round((q.counts[4] / q.responsesCount) * 100) : 0} (${q.counts[4]})`,
+          `%${q.responsesCount > 0 ? Math.round((q.counts[3] / q.responsesCount) * 100) : 0} (${q.counts[3]})`,
+          `%${q.responsesCount > 0 ? Math.round((q.counts[2] / q.responsesCount) * 100) : 0} (${q.counts[2]})`,
+          `%${q.responsesCount > 0 ? Math.round((q.counts[1] / q.responsesCount) * 100) : 0} (${q.counts[1]})`
+        ]);
+        
+        autoTable(doc, {
+          startY: 64,
+          head: [[
+            fixTR('Soru Maddesi Açıklaması'), 
+            fixTR(`5 Puan (${dynamicLikertLabels[5]})`), 
+            fixTR(`4 Puan (${dynamicLikertLabels[4]})`), 
+            fixTR(`3 Puan (${dynamicLikertLabels[3]})`), 
+            fixTR(`2 Puan (${dynamicLikertLabels[2]})`), 
+            fixTR(`1 Puan (${dynamicLikertLabels[1]})`)
+          ]],
+          body: rows,
+          styles: { font: 'Helvetica', fontSize: 8, cellPadding: 2.5 },
+          headStyles: { fillColor: [67, 24, 108], textColor: [255, 255, 255] },
+          columnStyles: { 0: { cellWidth: 85 } }
+        });
+        
+        doc.save(`Akademik_Anket_Raporu_Hafta_${selectedSurveyId}.pdf`);
+      };
+
       return (
         <>
-          {/* ÜST PANEL: GENEL DURUM KARTLARI */}
+          {/* ÜST İSTATİSTİK KARTLARI PANELİ */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-gradient-to-br from-purple-900 to-indigo-950 p-6 rounded-3xl shadow-xl text-white text-left flex flex-col justify-between">
               <div>
@@ -1994,7 +2068,7 @@ const surveyCategoryAverages = useMemo(() => {
                 </div>
                 <div className="w-full bg-gray-100 h-4 rounded-full overflow-hidden p-0.5 border shadow-inner">
                   <div 
-                    className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full transition-all duration-500 shadow-md"
+                    className="h-full bg-gradient-to-r from-purple-600 to-indigo-600 rounded-full transition-all duration-1000 shadow-md"
                     style={{ width: `${totalResponses > 0 ? dynamicPercentage : 0}%` }}
                   />
                 </div>
@@ -2010,79 +2084,27 @@ const surveyCategoryAverages = useMemo(() => {
               </div>
               <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden mt-4">
                 <div 
-                  className="h-full bg-green-500 transition-all duration-500" 
+                  className="h-full bg-green-500 transition-all duration-1000" 
                   style={{ width: `${totalResponses > 0 ? (generalAverage / 5) * 100 : 0}%` }}
                 />
               </div>
             </div>
           </div>
 
-          {/* HOCANIN TAM İSTEDİĞİ YER: SORU BAZLI AYRI AYRI YÜZDELİK GRAFİK LİSTESİ */}
-          <div className="space-y-6">
-            <h3 className="text-sm font-black text-purple-950 uppercase tracking-widest text-left border-l-4 border-purple-600 pl-2">
-              Maddelere Göre Soru Bazlı Yüzdelik Likert Dağılımları
-            </h3>
-            
-            {groupedQuestions.length > 0 ? (
-              groupedQuestions.map((q, qi) => (
-                <div key={qi} className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-left space-y-4">
-                  {/* Soru Başlığı ve Kategorisi */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
-                    <h4 className="text-sm font-black text-purple-950 leading-snug">
-                      {qi + 1}. &quot;{q.questionText}&quot;
-                    </h4>
-                    <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest self-start sm:self-center">
-                      {q.category}
-                    </span>
-                  </div>
-
-                  {/* Soruya Ait 5 Ayrı Likert Çubuğu */}
-                  <div className="grid grid-cols-1 gap-2.5">
-                    {[5, 4, 3, 2, 1].map((score) => {
-                      const count = q.counts[score] || 0;
-                      const pct = q.responsesCount > 0 ? Math.round((count / q.responsesCount) * 100) : 0;
-                      const currentLabel = q.labels[score] || fallbackLabels[score];
-
-                      return (
-                        <div key={score} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-gray-50/50 p-2.5 rounded-xl border border-gray-100/50 hover:bg-purple-50/10 transition-all">
-                          {/* Şık ve Şık Metni */}
-                          <div className="sm:w-44 shrink-0 text-left leading-tight">
-                            <span className="text-xs font-black text-purple-950 block">{score} Puan</span>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase truncate block">{currentLabel}</span>
-                          </div>
-                          
-                          {/* Saf Çubuk Grafik */}
-                          <div className="flex-1 bg-gray-200 h-3.5 rounded-full overflow-hidden p-0.5 shadow-inner">
-                            <div 
-                              className="h-full bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full transition-all duration-700 ease-out"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-
-                          {/* İstatistik Göstergesi */}
-                          <div className="sm:w-28 text-right font-black shrink-0 text-xs text-purple-950 leading-none">
-                            %{pct} <span className="text-[10px] text-gray-400 font-normal">({count} Öğrenci)</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="bg-white p-8 text-center text-gray-400 rounded-3xl border border-dashed font-bold uppercase text-xs">
-                Soru bazlı analiz oluşturulacak veri bulunamadı.
-              </div>
-            )}
-          </div>
-
-          {/* DETAYLI VERİ TABLO ALANI */}
+          {/* ÖĞRENCİ BAZLI DETAYLI VERİ TABLOSU */}
           <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden text-left">
             <div className="p-6 border-b bg-purple-50/20 flex justify-between items-center">
               <h2 className="font-black text-purple-950 uppercase text-xs tracking-widest flex items-center gap-2 leading-none">
                 <ListChecks size={18} className="text-purple-600" /> Öğrenci Bazlı Ölçek Veritabanı Maddeleri
               </h2>
+              <button 
+                onClick={handlePDFExport}
+                className="bg-purple-950 hover:bg-purple-900 text-white font-black text-[10px] uppercase tracking-wider px-4 py-2 rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <FileText size={13} /> PDF Rapor Al
+              </button>
             </div>
+            
             <div className="overflow-x-auto custom-scrollbar">
               <table className="w-full text-left border-collapse min-w-[800px]">
                 <thead className="bg-purple-950 text-white text-[10px] font-black uppercase tracking-widest leading-none">
@@ -2102,7 +2124,7 @@ const surveyCategoryAverages = useMemo(() => {
                                           item.answer_text !== "null" && 
                                           item.answer_text.trim() !== "";
                       
-                      const displayLabel = isTextValid ? item.answer_text : (fallbackLabels[finalScore] || `${finalScore} Puan`);
+                      const displayLabel = isTextValid ? item.answer_text : (dynamicLikertLabels[finalScore] || `${finalScore} Puan`);
 
                       return (
                         <tr key={si} className="hover:bg-purple-50/20 transition-all">
@@ -2129,6 +2151,60 @@ const surveyCategoryAverages = useMemo(() => {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          {/* TARAYICIDAKİ EN KRİTİK ALAN: SORU BAZLI ÖĞRENCİ VE ŞIK İLERLEME ÇUBUKLARI LİSTESİ */}
+          <div className="space-y-6">
+            <h3 className="text-sm font-black text-purple-950 uppercase tracking-widest text-left border-l-4 border-purple-600 pl-2">
+              Maddelere Göre Soru Bazlı Yüzdelik Likert Dağılımları
+            </h3>
+            
+            {groupedQuestions.length > 0 ? (
+              groupedQuestions.map((q, qi) => (
+                <div key={qi} className="bg-white p-6 rounded-3xl shadow-xl border border-gray-100 text-left space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                    <h4 className="text-sm font-black text-purple-950 leading-snug">
+                      {qi + 1}. &quot;{q.questionText}&quot;
+                    </h4>
+                    <span className="bg-purple-100 text-purple-700 px-3 py-1 rounded-xl text-[9px] font-black uppercase tracking-widest self-start sm:self-center">
+                      {q.category}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2.5">
+                    {[5, 4, 3, 2, 1].map((score) => {
+                      const count = q.counts[score] || 0;
+                      const pct = q.responsesCount > 0 ? Math.round((count / q.responsesCount) * 100) : 0;
+                      const currentLabel = q.labels[score] || fallbackLabels[score];
+
+                      return (
+                        <div key={score} className="flex flex-col sm:flex-row sm:items-center gap-3 bg-gray-50/50 p-2.5 rounded-xl border border-gray-100/50 hover:bg-purple-50/10 transition-all">
+                          <div className="sm:w-44 shrink-0 text-left leading-tight">
+                            <span className="text-xs font-black text-purple-950 block">{score} Puan</span>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase truncate block">{currentLabel}</span>
+                          </div>
+                          
+                          <div className="flex-1 bg-gray-200 h-3.5 rounded-full overflow-hidden p-0.5 shadow-inner">
+                            <div 
+                              className="h-full bg-gradient-to-r from-purple-500 to-indigo-600 rounded-full transition-all duration-700 ease-out"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+
+                          <div className="sm:w-28 text-right font-black shrink-0 text-xs text-purple-950 refinement-percentage">
+                            %{pct} <span className="text-[10px] text-gray-400 font-normal">({count} Öğrenci)</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="bg-white p-8 text-center text-gray-400 rounded-3xl border border-dashed font-bold uppercase text-xs">
+                Soru bazlı grafik analizleri yükleniyor...
+              </div>
+            )}
           </div>
         </>
       );
