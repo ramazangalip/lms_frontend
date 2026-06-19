@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="tr" className={`${roboto.variable}`}>
-      <body className="antialiased font-roboto">
+      <body className="antialiased font-roboto suppressHydrationWarning">
         {children}
       </body>
     </html>
