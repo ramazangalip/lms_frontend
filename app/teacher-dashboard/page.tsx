@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import api from '@/lib/api';
 import { AxiosError } from 'axios';
 import {
@@ -229,6 +229,8 @@ export default function TeacherDashboard() {
   const [description, setDescription] = useState('');
   const [releaseDate, setReleaseDate] = useState('');
   const [dueDate, setDueDate] = useState('');
+  const [scheduleDept, setScheduleDept] = useState<string>('cocukgelisimi');
+  const [weekSchedules, setWeekSchedules] = useState<Record<string, { release_date: string | null; due_date: string | null }>>({});
 
   const [introTitle, setIntroTitle] = useState('Genel Tanıtım ve Oryantasyon');
   const [introVideoUrl, setIntroVideoUrl] = useState('');
@@ -256,58 +258,74 @@ export default function TeacherDashboard() {
   // 1. ADIM: TÜM VERİ ÇEKME FONKSIYONLARI (ÜSTTE OLMALI)
   // =================================================================
 
-  // --- 1. ÖĞRENCİ ANALİZLERİNİ ÇEKME ---
-  const fetchAnalytics = useCallback(async (page = 1) => {
-    if (!selectedDepartment || selectedDepartment === 'all') return;
+  const currentDeptRef = useRef(selectedDepartment);
+
+  // --- 1. ÖĞRENCİ ANALİZLERİNİ ÇEKME (DECOUPLED & RACE-CONDITION PROTECTED) ---
+  const fetchAnalytics = useCallback(async (dept = selectedDepartment, page = currentPage) => {
+    if (!dept || dept === 'all') return;
+    currentDeptRef.current = dept;
     setLoading(true);
-    setAnalytics([]); 
+    setAnalytics([]); // Anlık görsel yükleme geri bildirimi için tabloyu temizle
+    
+    // 1. ÖĞRENCİ TABLOSUNU ANINDA GÜNCELLEMEK İÇİN ANALYTICS İSTEĞİNİ HIZLICA AT
     try {
-      const [res, bulkRes] = await Promise.all([
-        api.get(`/contents/analytics/?department=${selectedDepartment}&page=${page}`),
-        api.get(`/contents/bulk-academic-report/?department=${selectedDepartment}`)
-      ]);
+      const res = await api.get(`/contents/analytics/?department=${dept}&page=${page}`);
       
+      // Kullanıcı istek devam ederken başka bir bölüme geçtiyse eski yanıtı yoksay
+      if (currentDeptRef.current !== dept) return;
+
       if (res.data && res.data.results) {
         setAnalytics(res.data.results);
         setTotalCount(res.data.count); 
-      } else {
+      } else if (Array.isArray(res.data)) {
         setAnalytics(res.data);
-        if (Array.isArray(res.data)) {
-          setTotalCount(res.data.length);
-        }
+        setTotalCount(res.data.length);
+      } else {
+        setAnalytics([]);
+        setTotalCount(0);
       }
-      setBulkData(bulkRes.data);
     } catch (err) {
-      console.error("Analiz verileri yüklenemedi:", err);
-      setAnalytics([]); 
-      setBulkData([]);
-      setTotalCount(0);
+      if (currentDeptRef.current === dept) {
+        console.error("Analiz verileri yüklenemedi:", err);
+        setAnalytics([]); 
+        setTotalCount(0);
+      }
     } finally {
-      setLoading(false);
+      if (currentDeptRef.current === dept) {
+        setLoading(false);
+      }
     }
-  }, [selectedDepartment, setAnalytics, setBulkData, setTotalCount, setLoading]);
+
+    // 2. PDF RAPORU VERİSİNİ ARKA PLANDA BAĞIMSIZ ÇEK (TABLO GÜNCELLEMESİNİ BLOKLAMAZ)
+    try {
+      const bulkRes = await api.get(`/contents/bulk-academic-report/?department=${dept}`);
+      if (currentDeptRef.current === dept) {
+        setBulkData(bulkRes.data);
+      }
+    } catch (err) {
+      console.error("Bulk akademik rapor çekilemedi:", err);
+    }
+  }, [selectedDepartment, currentPage]);
 
 // --- 2. CHATBOT ANALİZLERİNİ ÇEKME ---
-  const fetchChatbotAnalytics = useCallback(async () => {
-    if (!selectedDepartment || selectedDepartment === 'all') return;
+  const fetchChatbotAnalytics = useCallback(async (dept = selectedDepartment) => {
+    if (!dept || dept === 'all') return;
     setChatbotData([]);
     try {
-      const res = await api.get(`/contents/chatbot-analytics/?department=${selectedDepartment}`);
+      const res = await api.get(`/contents/chatbot-analytics/?department=${dept}`);
       setChatbotData(res.data);
     } catch (err) {
       console.error("Chatbot verileri yüklenemedi:", err);
       setChatbotData([]);
     }
-  }, [selectedDepartment, setChatbotData]);
+  }, [selectedDepartment]);
 
  // --- 3. ANKET ANALİZ SONUÇLARINI ÇEKME ---
- // --- ANKET ANALİZ SONUÇLARINI BACKEND'DEN ÇEKME ---
-const fetchSurveyAnalytics = useCallback(async () => {
-  if (!selectedDepartment || selectedDepartment === 'all') return;
+const fetchSurveyAnalytics = useCallback(async (dept = selectedDepartment) => {
+  if (!dept || dept === 'all') return;
   setLoading(true);
   try {
-    // Doğrudan seçili anket ID'sini backend'e gönderiyoruz
-    const res = await api.get(`/contents/academic/surveys/report/?department=${selectedDepartment}&survey_id=${selectedSurveyId}`);
+    const res = await api.get(`/contents/academic/surveys/report/?department=${dept}&survey_id=${selectedSurveyId}`);
     setSurveyAnalysis(res.data);
   } catch (err) {
     console.error("Anket analizleri çekilemedi:", err);
@@ -315,21 +333,21 @@ const fetchSurveyAnalytics = useCallback(async () => {
   } finally {
     setLoading(false);
   }
-}, [selectedDepartment, selectedSurveyId, setSurveyAnalysis, setLoading]);
+}, [selectedDepartment, selectedSurveyId]);
 
   // =================================================================
-  // 2. ADIM: ANCAK HER ŞEY TANIMLANDIKTAN SONRA EFFECT TETİKLENMELİ
+  // 2. ADIM: SEKME VE BÖLÜM DEĞİŞİMİNDE VERİ TETİKLEME
   useEffect(() => {
     if (!selectedDepartment || selectedDepartment === 'all') return;
 
     if (activeTab === 'analytics') {
-      fetchAnalytics(currentPage);
+      fetchAnalytics(selectedDepartment, currentPage);
     }
     if (activeTab === 'chatbot') {
-      fetchChatbotAnalytics();
+      fetchChatbotAnalytics(selectedDepartment);
     }
     if (activeTab === 'survey_results') {
-      fetchSurveyAnalytics(); 
+      fetchSurveyAnalytics(selectedDepartment); 
     }
   }, [activeTab, selectedDepartment, currentPage, fetchAnalytics, fetchChatbotAnalytics, fetchSurveyAnalytics]);
 
@@ -461,14 +479,24 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
       setTitle(data.title || '');
       setDescription(data.description || '');
 
-      // 2. Tarih Formatlama
-      if (data.release_date) {
+      // 2. Tarih Formatlama ve Bölüm Takvimi
+      const rawSchedules = data.schedules || {};
+      setWeekSchedules(rawSchedules);
+
+      const activeDeptKey = scheduleDept || 'cocukgelisimi';
+      const currentDeptSchedule = rawSchedules[activeDeptKey];
+
+      if (currentDeptSchedule && currentDeptSchedule.release_date) {
+        setReleaseDate(currentDeptSchedule.release_date.split('T')[0]);
+      } else if (data.release_date) {
         setReleaseDate(data.release_date.split('T')[0]);
       } else {
         setReleaseDate('');
       }
 
-      if (data.due_date) {
+      if (currentDeptSchedule && currentDeptSchedule.due_date) {
+        setDueDate(currentDeptSchedule.due_date.split('T')[0]);
+      } else if (data.due_date) {
         setDueDate(data.due_date.split('T')[0]);
       } else {
         setDueDate('');
@@ -620,14 +648,7 @@ useEffect(() => {
 // --- ANALİZ VERİLERİNİ ÇEKME ---
 
 
-  // --- KRİTİK: BÖLÜM VEYA SAYFA DEĞİŞTİĞİNDE VERİYİ ÇEK ---
-  useEffect(() => {
-    if (activeTab === 'analytics' && selectedDepartment) {
-      // Bölüm değiştiğinde sayfayı 1'e resetlemek mantıklı olabilir
-      // setCurrentPage(1); 
-      fetchAnalytics(currentPage);
-    }
-  }, [activeTab, selectedDepartment, currentPage, fetchAnalytics]);
+
 
 
 
@@ -827,6 +848,7 @@ const surveyCategoryAverages = useMemo(() => {
             description: description,
             release_date: releaseDate || null,
             due_date: dueDate || null,
+            schedule_department: scheduleDept,
             intro_title: introTitle,
             intro_video_url: introVideoUrl,
             intro_description: introDescription,
@@ -1200,16 +1222,41 @@ const surveyCategoryAverages = useMemo(() => {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-10 text-left">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 items-end">
                 <div className="lg:col-span-1 text-left leading-none">
                   <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest leading-none">Düzenlenen Hafta</label>
                   <select value={weekNumber} onChange={(e) => setWeekNumber(Number(e.target.value))} className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-black font-bold outline-none focus:border-red-500 transition-colors text-sm shadow-inner leading-none">
                     {Array.from({ length: 14 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. Hafta</option>)}
                   </select>
                 </div>
-                <div className="lg:col-span-3 text-left leading-none">
+                <div className="lg:col-span-1 text-left leading-none">
                   <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest leading-none">Haftalık Konu Başlığı</label>
                   <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-black outline-none focus:border-red-500 font-bold transition-all text-sm shadow-inner leading-none" placeholder="Haftanın ana başlığını giriniz..." />
+                </div>
+                <div className="lg:col-span-1 text-left leading-none">
+                  <label className="block text-[10px] font-black text-[#ce1212] uppercase mb-2 tracking-widest leading-none flex items-center gap-1">
+                    <Filter size={12} /> Tarih İçin Bölüm
+                  </label>
+                  <select 
+                    value={scheduleDept} 
+                    onChange={(e) => {
+                      const newDept = e.target.value;
+                      setScheduleDept(newDept);
+                      if (weekSchedules[newDept]) {
+                        const sch = weekSchedules[newDept];
+                        setReleaseDate(sch.release_date ? sch.release_date.split('T')[0] : '');
+                        setDueDate(sch.due_date ? sch.due_date.split('T')[0] : '');
+                      } else {
+                        setReleaseDate('');
+                        setDueDate('');
+                      }
+                    }}
+                    className="w-full p-4 rounded-2xl border-2 border-red-100 bg-red-50/40 text-black font-bold outline-none focus:border-red-500 shadow-inner leading-none cursor-pointer text-xs uppercase"
+                  >
+                    {departmentList.map(d => (
+                      <option key={d.id} value={d.id}>📍 {d.name.toUpperCase()}</option>
+                    ))}
+                  </select>
                 </div>
                 <div className="lg:col-span-1 text-left leading-none">
                   <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest leading-none">Erişim Tarihi (Aktif)</label>
@@ -1690,8 +1737,10 @@ const surveyCategoryAverages = useMemo(() => {
           <select 
             value={selectedDepartment} 
             onChange={(e) => {
-              setSelectedDepartment(e.target.value);
-              setCurrentPage(1); // Bölüm değişince 1. sayfaya dön
+              const newDept = e.target.value;
+              setSelectedDepartment(newDept);
+              setCurrentPage(1);
+              fetchAnalytics(newDept, 1);
             }} 
             className="bg-transparent text-[10px] font-black uppercase outline-none cursor-pointer"
           >
@@ -1796,7 +1845,13 @@ const surveyCategoryAverages = useMemo(() => {
         <div className="flex items-center gap-2">
           <button 
             disabled={currentPage === 1 || loading}
-            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+            onClick={() => {
+              const prevPage = Math.max(currentPage - 1, 1);
+              if (prevPage !== currentPage) {
+                setCurrentPage(prevPage);
+                fetchAnalytics(selectedDepartment, prevPage);
+              }
+            }}
             className="p-3 rounded-xl bg-white border border-gray-200 shadow-sm text-secondary disabled:opacity-30 hover:bg-gray-100 transition-all active:scale-90"
           >
             <ChevronLeft size={20} />
@@ -1807,8 +1862,12 @@ const surveyCategoryAverages = useMemo(() => {
           </div>
 
           <button 
-            disabled={analytics.length < 10 || loading} // 10'dan az veri varsa sonraki sayfa yoktur
-            onClick={() => setCurrentPage(prev => prev + 1)}
+            disabled={analytics.length < 10 || loading}
+            onClick={() => {
+              const nextPage = currentPage + 1;
+              setCurrentPage(nextPage);
+              fetchAnalytics(selectedDepartment, nextPage);
+            }}
             className="p-3 rounded-xl bg-white border border-gray-200 shadow-sm text-secondary disabled:opacity-30 hover:bg-gray-100 transition-all active:scale-90"
           >
             <ChevronRight size={20} />

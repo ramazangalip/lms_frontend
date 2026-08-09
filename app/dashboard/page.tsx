@@ -278,19 +278,60 @@ const fetchContents = async (isUpdate = false) => {
 
   const handleCompleteMaterial = async (materialId: number | string) => {
     if (!materialId) return;
+    const strMatId = String(materialId);
+
+    // 1. Anında tamamlandı olarak işaretle (Optimistic update)
+    setCompletedMaterials(prev => prev.includes(strMatId) ? prev : [...prev, strMatId]);
+
     try {
-      const res = await api.post('contents/complete-material/', { material_id: String(materialId) });
+      const res = await api.post('contents/complete-material/', { material_id: strMatId });
+      
       if (res.data.status === "success") {
+          // 2. Toplam puanı anında güncelle
+          if (res.data.total_points !== undefined) {
+              setUserTotalPoints(res.data.total_points);
+          }
+          
+          // 3. Kazanılan puan bildirimini göster
           if (res.data.new_points_earned > 0) {
               setPointsEarned({ show: true, amount: res.data.new_points_earned });
-              setUserTotalPoints(res.data.total_points);
               setTimeout(() => setPointsEarned({ show: false, amount: 0 }), 5000);
           }
+
+          // 4. İlerleme yüzdesini ve hafta durumunu ekranda anında güncelle
+          if (res.data.current_percentage !== undefined && selectedWeek) {
+              const newPercentage = Math.round(res.data.current_percentage);
+              const isFinished = newPercentage >= 100;
+
+              setSelectedWeek(prev => prev ? {
+                  ...prev,
+                  progress: newPercentage,
+                  is_completed: isFinished,
+                  total_score: res.data.total_points !== undefined ? res.data.total_points : prev.total_score
+              } : null);
+
+              setContents(prevContents => prevContents.map(w => {
+                  if (w.id === selectedWeek.id) {
+                      return {
+                          ...w,
+                          progress: newPercentage,
+                          is_completed: isFinished,
+                          total_score: res.data.total_points !== undefined ? res.data.total_points : w.total_score
+                      };
+                  }
+                  return w;
+              }));
+          }
       }
+
       if (watchTimerRef.current) clearInterval(watchTimerRef.current);
       watchTimeInternalRef.current = 0; setWatchTime(0);
+
+      // 5. Arka planda sunucu senkronizasyonunu tazele
       await fetchContents(true);
-    } catch (err) { console.error("Tamamlama hatası."); }
+    } catch (err) { 
+      console.error("Tamamlama hatası."); 
+    }
   };
 
   useEffect(() => {
@@ -1091,7 +1132,7 @@ const handleEntryTestSubmit = async () => {
                   <div className="text-right">
                     <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter leading-none mb-1">Toplam Puan</p>
                     <p className="text-xl font-black text-secondary leading-none">
-                      {selectedWeek.total_score || 0} <span className="text-[10px] text-gray-400 font-bold">Puan</span>
+                      {userTotalPoints || selectedWeek.total_score || 0} <span className="text-[10px] text-gray-400 font-bold">Puan</span>
                     </p>
                   </div>
                 </div>
