@@ -228,6 +228,7 @@ export default function TeacherDashboard() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [releaseDate, setReleaseDate] = useState('');
+  const [dueDate, setDueDate] = useState('');
 
   const [introTitle, setIntroTitle] = useState('Genel Tanıtım ve Oryantasyon');
   const [introVideoUrl, setIntroVideoUrl] = useState('');
@@ -467,6 +468,12 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
         setReleaseDate('');
       }
 
+      if (data.due_date) {
+        setDueDate(data.due_date.split('T')[0]);
+      } else {
+        setDueDate('');
+      }
+
       // 3. Oryantasyon Bilgileri
       if (data.intro_video_url !== undefined) {
         setIntroVideoUrl(data.intro_video_url || '');
@@ -548,6 +555,7 @@ const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
       setTitle('');
       setDescription('');
       setReleaseDate('');
+      setDueDate('');
       setMaterials([{ content_type: 'video', embed_url: '', title: '', point_value: 10 }]);
       setFlashcards([]);
       setPreTestQuestions([]);
@@ -818,6 +826,7 @@ const surveyCategoryAverages = useMemo(() => {
             title: title,
             description: description,
             release_date: releaseDate || null,
+            due_date: dueDate || null,
             intro_title: introTitle,
             intro_video_url: introVideoUrl,
             intro_description: introDescription,
@@ -1191,20 +1200,24 @@ const surveyCategoryAverages = useMemo(() => {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10 text-left">
-                <div className="md:col-span-1 text-left leading-none">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6 mb-10 text-left">
+                <div className="lg:col-span-1 text-left leading-none">
                   <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest leading-none">Düzenlenen Hafta</label>
                   <select value={weekNumber} onChange={(e) => setWeekNumber(Number(e.target.value))} className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-black font-bold outline-none focus:border-red-500 transition-colors text-sm shadow-inner leading-none">
                     {Array.from({ length: 14 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n}. Hafta</option>)}
                   </select>
                 </div>
-                <div className="md:col-span-2 text-left leading-none">
+                <div className="lg:col-span-3 text-left leading-none">
                   <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest leading-none">Haftalık Konu Başlığı</label>
-                  <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-black outline-none focus:border-red-500 font-bold transition-all text-sm shadow-inner leading-none" placeholder="Haftanın ana başlığını giriniz..." />
+                  <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 text-black outline-none focus:border-red-500 font-bold transition-all text-sm shadow-inner leading-none" placeholder="Haftanın ana başlığını giriniz..." />
                 </div>
-                <div className="md:col-span-1 text-left leading-none">
-                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest leading-none">Erişim Tarihi (Kilit)</label>
+                <div className="lg:col-span-1 text-left leading-none">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest leading-none">Erişim Tarihi (Aktif)</label>
                   <input type="date" value={releaseDate} onChange={(e) => setReleaseDate(e.target.value)} className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 font-bold outline-none focus:border-red-500 shadow-inner leading-none" />
+                </div>
+                <div className="lg:col-span-1 text-left leading-none">
+                  <label className="block text-[10px] font-black text-gray-400 uppercase mb-2 tracking-widest leading-none">Kapanış Tarihi (Pasif)</label>
+                  <input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="w-full p-4 rounded-2xl border-2 border-gray-100 bg-gray-50 font-bold outline-none focus:border-red-500 shadow-inner leading-none" />
                 </div>
               </div>
 

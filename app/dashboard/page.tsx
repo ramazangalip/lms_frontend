@@ -37,6 +37,7 @@ interface WeeklyContent {
   intro_description?: string; 
   intro_video_url?: string; 
   release_date?: string; 
+  due_date?: string;
   is_locked: boolean;
   total_score?: number; // Burayı ekledik 
   lock_reason?: string; 
