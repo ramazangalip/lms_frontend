@@ -26,6 +26,7 @@ interface Material {
   embed_url: string; 
   title: string; 
   point_value?: number; 
+  min_duration_seconds?: number;
   quiz?: Quiz; 
 }
 interface WeeklyContent {
@@ -580,13 +581,16 @@ const handleEntryTestSubmit = async () => {
     if (watchTimerRef.current) clearInterval(watchTimerRef.current);
     if (!isIntroView && activeMaterial && (activeMaterial.content_type === 'video' || activeMaterial.content_type === 'podcast') && !completedMaterials.includes(String(activeMaterial.id)) && introStatus.isWatched) {
       watchTimeInternalRef.current = 0;
+      const targetThreshold = (activeMaterial.min_duration_seconds && activeMaterial.min_duration_seconds > 0)
+        ? activeMaterial.min_duration_seconds
+        : 300;
       watchTimerRef.current = setInterval(() => {
         watchTimeInternalRef.current += 1; setWatchTime(watchTimeInternalRef.current);
-        if (watchTimeInternalRef.current >= materialWatchThreshold) { if (activeMaterialRef.current) handleCompleteMaterial(activeMaterialRef.current.id); }
+        if (watchTimeInternalRef.current >= targetThreshold) { if (activeMaterialRef.current) handleCompleteMaterial(activeMaterialRef.current.id); }
       }, 1000);
     }
     return () => { if (watchTimerRef.current) clearInterval(watchTimerRef.current); };
-  }, [activeMaterial?.id, isIntroView, completedMaterials.length, introStatus.isWatched]);
+  }, [activeMaterial?.id, activeMaterial?.min_duration_seconds, isIntroView, completedMaterials.length, introStatus.isWatched]);
 
   // --- HAFTA DEĞİŞTİĞİNDE SINAV SONUCUNU TEMİZLE VEYA GETİR ---
   const handleWeekSelection = (weekData: WeeklyContent) => {
