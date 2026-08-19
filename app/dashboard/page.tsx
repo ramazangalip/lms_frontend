@@ -198,40 +198,34 @@ const handleSurveySubmit = async () => {
 
 const fetchContents = async (isUpdate = false) => {
   try {
-    const [contentRes, progressRes, completedMatsRes, analyticsRes, preTestRes] = await Promise.all([
+    const [contentRes, bootstrapRes] = await Promise.all([
       api.get('/contents/list/'), 
-      api.get('/contents/studentprogress/'),
-      api.get('/contents/completed-materials-ids/'), 
-      api.get('/contents/analytics/'),
-      api.get('/contents/pre-test/status/')
+      api.get('/contents/bootstrap/')
     ]);
 
     // 1. ÖN TEST VERİLERİNİ SETLE
-    if (preTestRes.data) {
-      setPreTestQuestions(preTestRes.data.questions || []);
-      if (preTestRes.data.result) {
-        const { is_completed, score, correct, wrong } = preTestRes.data.result;
+    if (bootstrapRes.data?.pre_test) {
+      setPreTestQuestions(bootstrapRes.data.pre_test.questions || []);
+      if (bootstrapRes.data.pre_test.result) {
+        const { is_completed, score, correct, wrong } = bootstrapRes.data.pre_test.result;
         setPreTestResult({ is_completed, score, correct, wrong });
       }
     }
     
     // 2. Kullanıcı puanlarını güncelle
-    setUserTotalPoints(analyticsRes.data.total_points || 0);
+    setUserTotalPoints(bootstrapRes.data?.user_info?.total_points || 0);
     
     // 3. Tamamlanan materyal ID'lerini listele
-    const stringifiedCompleted = (completedMatsRes.data || []).map((id: any) => String(id));
+    const stringifiedCompleted = (bootstrapRes.data?.completed_material_ids || []).map((id: any) => String(id));
     setCompletedMaterials(stringifiedCompleted);
     
-    // 4. HAFTALIK İÇERİKLERİ VE ANKET VERİLERİNİ BİRLEŞTİR (KRİTİK GÜNCELLEME)
+    // 4. HAFTALIK İÇERİKLERİ VE ANKET VERİLERİNİ BİRLEŞTİR
     const rawContents = contentRes.data;
     const mergedData = rawContents.map((week: WeeklyContent) => {
-      const foundProgress = progressRes.data.find((p: ProgressData) => String(p.weekly_content) === String(week.id));
-      
       return { 
         ...week, 
-        progress: foundProgress ? Math.round(foundProgress.completion_percentage) : 0, 
-        is_completed: foundProgress ? foundProgress.is_completed : false,
-        // Backend'den gelen anket kilit durumunu ve verilerini buraya mutlaka ekliyoruz
+        progress: Math.round(week.progress || 0), 
+        is_completed: !!week.is_completed,
         is_survey_required: week.is_survey_required, 
         survey_data: week.survey_data 
       };
