@@ -201,9 +201,8 @@ export default function StudentDashboard() {
 
       if (isInitialMount.current && mergedData.length > 0 && !selectedWeek) {
         const firstWeek = mergedData.sort((a: WeeklyContent, b: WeeklyContent) => a.week_number - b.week_number)[0];
-        setSelectedWeek(firstWeek);
-        setIsIntroView(true);
         isInitialMount.current = false;
+        handleWeekSelection(firstWeek);
       }
     } catch (err) {
       console.error("İçerik yükleme hatası:", err);
@@ -517,25 +516,46 @@ export default function StudentDashboard() {
     };
   }, [activeMaterial?.id, activeMaterial?.min_duration_seconds, isIntroView, completedMaterials.length, introStatus.isWatched]);
 
-  const handleWeekSelection = (weekData: WeeklyContent) => {
+  const handleWeekSelection = async (weekData: WeeklyContent) => {
     if (weekData.is_locked) return;
-    setSelectedWeek(weekData);
+    setIsIntroView(false);
     setQuizResult(null);
     setSelectedAnswers({});
     setCurrentAttemptId(null);
-    setIsIntroView(false);
-
-    const quizMat = weekData.materials.find((m) => m.content_type === 'form');
-    if (quizMat && completedMaterials.includes(String(quizMat.id))) {
-      api.get(`/contents/quiz/${quizMat.quiz?.id}/last-attempt/`).then((res) => {
-        setQuizResult({ score: res.data.score, correct: res.data.correct, wrong: res.data.wrong });
-        setCurrentAttemptId(String(res.data.id));
-      }).catch(() => {});
-    }
-
-    if (weekData.materials.length > 0) setActiveMaterial(getSortedMaterials(weekData.materials)[0]);
-    else setActiveMaterial(null);
     setIsSidebarOpen(false);
+
+    try {
+      const res = await api.get(`/contents/list/?week_number=${weekData.week_number}`);
+      const fullWeekData: WeeklyContent = res.data;
+      setSelectedWeek(fullWeekData);
+
+      const quizMat = fullWeekData.materials.find((m) => m.content_type === 'form');
+      if (quizMat && completedMaterials.includes(String(quizMat.id))) {
+        try {
+          const lastAttemptRes = await api.get(`/contents/quiz/${quizMat.quiz?.id}/last-attempt/`);
+          if (lastAttemptRes.data) {
+            setQuizResult({ score: lastAttemptRes.data.score, correct: lastAttemptRes.data.correct, wrong: lastAttemptRes.data.wrong });
+            setCurrentAttemptId(String(lastAttemptRes.data.id));
+          }
+        } catch (qErr) {
+          console.log("Sınav verisi çekilemedi.");
+        }
+      }
+
+      if (fullWeekData.materials && fullWeekData.materials.length > 0) {
+        setActiveMaterial(getSortedMaterials(fullWeekData.materials)[0]);
+      } else {
+        setActiveMaterial(null);
+      }
+    } catch (err) {
+      console.error("Hafta detay verisi çekilemedi:", err);
+      setSelectedWeek(weekData);
+      if (weekData.materials && weekData.materials.length > 0) {
+        setActiveMaterial(getSortedMaterials(weekData.materials)[0]);
+      } else {
+        setActiveMaterial(null);
+      }
+    }
   };
 
   const handleCloseModalAndRefresh = async () => {
