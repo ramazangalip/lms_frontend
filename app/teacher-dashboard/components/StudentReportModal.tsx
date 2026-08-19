@@ -9,9 +9,10 @@ import {
   CheckCircle,
   AlertCircle,
   MessageSquare,
-  Bot
+  Bot,
+  Clock
 } from 'lucide-react';
-import { StudentAnalytics, getDeptName } from '../types';
+import { StudentAnalytics, getDeptName, formatDuration } from '../types';
 
 interface StudentReportModalProps {
   selectedStudent: StudentAnalytics | null;
@@ -95,6 +96,28 @@ export const StudentReportModal: React.FC<StudentReportModalProps> = ({
                   {week.progress === 100 && <span className="text-[10px] text-green-600 font-bold flex items-center gap-1"><Check size={12} /> BAŞARIYLA BİTİRİLDİ</span>}
                 </div>
               </div>
+
+              {/* MATERYAL BAZLI TUR 1 / TUR 2 SÜRE DAĞILIMI */}
+              {week.material_details && week.material_details.length > 0 && (
+                <div className="space-y-3 border-t border-gray-200 pt-4">
+                  <div className="flex items-center gap-2 text-secondary leading-none mb-1">
+                    <Clock size={16} className="text-blue-600" />
+                    <p className="text-[10px] font-black uppercase tracking-widest leading-none">
+                      Materyal Bazlı Süre Detayları (T1 / T2)
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">
+                    {week.material_details.map((mat, mi) => (
+                      <div key={mi} className="p-3 bg-white rounded-xl border border-gray-200 flex justify-between items-center text-xs">
+                        <span className="font-bold text-gray-800 truncate mr-2">• {mat.title}</span>
+                        <span className="font-black text-[10px] text-blue-800 bg-blue-50 px-2 py-1 rounded-lg shrink-0 border border-blue-100">
+                          T1: {formatDuration(mat.duration_seconds_t1 || 0)} | T2: {mat.duration_seconds_t2 ? formatDuration(mat.duration_seconds_t2) : '-'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* 1. SINAV DETAY ANALİZİ */}
               {week.quiz_results && week.quiz_results.length > 0 && (

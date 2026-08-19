@@ -81,9 +81,12 @@ export interface WeeklyProgress {
   questions?: string[];
   quiz_results?: QuizDetailAnalysis[];
   material_details?: {
+    id?: number;
     title: string;
     content_type: string;
     duration_seconds: number;
+    duration_seconds_t1?: number;
+    duration_seconds_t2?: number;
   }[];
 }
 
@@ -95,6 +98,8 @@ export interface BulkStudentData {
   total_points: number;
   pre_test_score?: string;
   total_time: number;
+  total_time_t1?: number;
+  total_time_t2?: number;
   weekly_breakdown: {
     week: number;
     progress: number;
@@ -112,9 +117,12 @@ export interface BulkStudentData {
     quiz_results?: QuizDetailAnalysis[];
     questions?: string[];
     material_details?: {
+      id?: number;
       title: string;
       content_type: string;
       duration_seconds: number;
+      duration_seconds_t1?: number;
+      duration_seconds_t2?: number;
     }[];
   }[];
 }

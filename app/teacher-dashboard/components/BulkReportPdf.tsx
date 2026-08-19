@@ -11,119 +11,186 @@ export const BulkReportPdf: React.FC<BulkReportPdfProps> = ({
   filteredBulkData,
   selectedDepartment
 }) => {
+  // Sayfa başına maksimum 3 öğrenci (Ferah, okunabilir ve geniş A4 Yatay düzen)
+  const STUDENTS_PER_PAGE = 3;
+  const totalPages = Math.ceil(filteredBulkData.length / STUDENTS_PER_PAGE);
+
   return (
-    <div id="bulk-report-pdf" className="hidden print:block bg-white p-0 text-left">
-      {Array.from({ length: Math.ceil(filteredBulkData.length / 6) }, (_, i) =>
-        filteredBulkData.slice(i * 6, i * 6 + 6)
-      ).map((studentGroup, pageIdx) => (
-        <div 
-          key={pageIdx} 
-          className="p-4 text-left" 
-          style={{ 
-            pageBreakAfter: 'always', 
-            width: '297mm', // Yatay A4 standardı
-            margin: '0 auto' 
-          }}
-        >
-          {/* LOGO VE BAŞLIK */}
-          <div className="flex flex-col items-center mb-6 border-b-4 border-black pb-4 text-center">
-            <img 
-              src="/okul-logo.png" 
-              alt="Okul Logosu" 
-              className="h-16 object-contain mb-3" 
-              onError={(e) => (e.currentTarget.style.display = 'none')} 
-            />
-            <h1 className="text-xl font-black uppercase tracking-tighter text-black">
-              SİSTEM GENELİ AKADEMİK GELİŞİM VE PERFORMANS ÇİZELGESİ
-            </h1>
-            <p className="text-xs font-bold text-gray-700 mt-1 uppercase tracking-widest">
-              Bölüm: {getDeptName(selectedDepartment).toUpperCase()} (Sayfa {pageIdx + 1})
-            </p>
-          </div>
+    <>
+      {/* PDF Baskı Stilleri (Yatay A4 ve Sayfa Sonu Kuralları) */}
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: A4 landscape;
+            margin: 6mm 6mm 6mm 6mm;
+          }
+          body {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          .pdf-page-break {
+            page-break-after: always !important;
+            break-after: page !important;
+          }
+          tr {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+        }
+      `}</style>
 
-          {/* GRUP TABLOSU */}
-          <table className="w-full border-collapse border-2 border-black table-fixed">
-            <thead>
-              <tr className="bg-black text-white text-center">
-                <th className="border-2 border-black p-1 text-[8px] font-black uppercase leading-none text-left w-[8%]">Öğrenci</th>
-                <th className="border-2 border-black p-1 text-[8px] font-black uppercase leading-none text-center bg-gray-200 text-black w-[4%]">ÖN TEST</th>
-                
-                {Array.from({ length: 14 }, (_, i) => i + 1).map(n => (
-                  <th key={n} className="border-2 border-black p-0.5 text-[6px] font-black uppercase leading-none text-center w-[5.75%]">
-                    H.{n}
+      <div id="bulk-report-pdf" className="hidden print:block bg-white p-0 text-left">
+        {Array.from({ length: totalPages }, (_, i) =>
+          filteredBulkData.slice(i * STUDENTS_PER_PAGE, i * STUDENTS_PER_PAGE + STUDENTS_PER_PAGE)
+        ).map((studentGroup, pageIdx) => (
+          <div
+            key={pageIdx}
+            className="p-2 text-left pdf-page-break"
+            style={{
+              pageBreakAfter: 'always',
+              width: '285mm',
+              margin: '0 auto'
+            }}
+          >
+            {/* LOGO VE BAŞLIK */}
+            <div className="flex flex-col items-center mb-3 border-b-2 border-black pb-2 text-center">
+              <img
+                src="/okul-logo.png"
+                alt="Okul Logosu"
+                className="h-12 object-contain mb-1"
+                onError={(e) => (e.currentTarget.style.display = 'none')}
+              />
+              <h1 className="text-base md:text-lg font-black uppercase tracking-tighter text-black">
+                SİSTEM GENELİ AKADEMİK GELİŞİM VE PERFORMANS ÇİZELGESİ
+              </h1>
+              <p className="text-[10px] font-bold text-gray-700 mt-0.5 uppercase tracking-widest">
+                Bölüm: {getDeptName(selectedDepartment).toUpperCase()} (Sayfa {pageIdx + 1} / {totalPages})
+              </p>
+            </div>
+
+            {/* GRUP TABLOSU (17 KOLON EKSİKSİZ VE FERAH) */}
+            <table className="w-full border-collapse border-2 border-black table-fixed">
+              <thead>
+                <tr className="bg-black text-white text-center">
+                  <th className="border-2 border-black p-1.5 text-[11px] font-black uppercase leading-tight text-left w-[8.5%]">
+                    Öğrenci
                   </th>
-                ))}
-                
-                <th className="border-2 border-black p-1 text-[9px] font-black uppercase leading-none text-center bg-gray-800 w-[7.5%]">GENEL TOPLAM</th>
-              </tr>
-            </thead>
-            <tbody className="text-left font-bold">
-              {studentGroup.map((student, idx) => (
-                <tr key={idx} className="text-center hover:bg-gray-50 leading-none border-b border-black">
-                  <td className="border-2 border-black p-1.5 text-[7px] font-black text-left uppercase leading-tight break-all">
-                    {student.full_name}
-                  </td>
-                  
-                  <td className="border-2 border-black p-1 text-[8px] font-black text-center italic bg-gray-50/50">
-                    {student.pre_test_score || "-"}
-                  </td>
-                  
-                  {student.weekly_breakdown.map((week, wIdx) => (
-                    <td key={wIdx} className="border-2 border-black p-0.5 text-[5px] font-bold leading-none align-top overflow-hidden">
-                      <div className="flex flex-col gap-1">
-                        {/* TUR 1 VERİLERİ */}
-                        <div className="flex flex-col border-b border-gray-300 pb-0.5 w-full items-center bg-blue-50/10">
-                          <div className="flex justify-between w-full px-0.5 mb-0.5 scale-[0.85]">
-                            <span className="text-gray-400 font-black">T1</span>
-                            <span className="text-blue-700 font-black">%{Math.round(week.progress)}</span>
-                          </div>
-                          <div className="flex flex-col items-center gap-0.5">
-                            <span className="text-[4px] text-gray-700">{week.correct}D / {week.wrong}Y</span>
-                            <span className="text-[4px] text-blue-600 font-black">{formatDuration(week.duration_seconds)}</span>
-                          </div>
-                        </div>
+                  <th className="border-2 border-black p-1.5 text-[11px] font-black uppercase leading-tight text-center bg-gray-200 text-black w-[5.5%]">
+                    ÖN TEST
+                  </th>
 
-                        {/* MATERYALLER */}
-                        <div className="flex flex-col gap-0.5 px-0.5">
-                          <p className="text-[3.5px] font-black text-gray-400 uppercase border-b border-gray-50 mb-0.5 text-left">Materyaller:</p>
-                          {week.material_details && week.material_details.length > 0 ? (
-                            week.material_details.map((mat, mi) => (
-                              <div key={mi} className="flex justify-between items-start gap-0.5 text-[4px] text-gray-600 leading-[1.1] mb-0.5">
-                                <span className="text-left break-words w-full">• {mat.title}</span>
-                                <span className="font-black shrink-0 text-secondary">{formatDuration(mat.duration_seconds)}</span>
-                              </div>
-                            ))
-                          ) : (
-                            <span className="text-[4px] text-gray-300 italic text-center">Yok</span>
-                          )}
-                        </div>
-
-                        {/* TUR 2 VERİLERİ */}
-                        {week.is_round_2_started ? (
-                          <div className="flex flex-col w-full items-center pt-0.5 border-t border-amber-200 bg-amber-50/30 mt-auto">
-                            <span className="text-amber-700 font-black scale-[0.6]">T2 AKTİF</span>
-                            <span className="text-green-700 font-black scale-[0.8]">{week.correct_2}D/{week.wrong_2}Y</span>
-                            <span className="text-[4px] text-amber-700 font-bold">{formatDuration(week.duration_seconds_2)}</span>
-                          </div>
-                        ) : null}
-                      </div>
-                    </td>
+                  {Array.from({ length: 14 }, (_, i) => i + 1).map((n) => (
+                    <th
+                      key={n}
+                      className="border-2 border-black p-1 text-[10px] font-black uppercase leading-tight text-center w-[5.6%]"
+                    >
+                      H.{n}
+                    </th>
                   ))}
 
-                  {/* BİRLEŞTİRİLMİŞ PUAN VE SÜRE */}
-                  <td className="border-2 border-black p-1 bg-gray-100">
-                    <div className="flex flex-col items-center justify-center gap-0.5">
-                       <span className="text-[9px] font-black text-blue-800 leading-none">{student.total_points} P.</span>
-                       <div className="w-full border-t border-black/20 my-1"></div>
-                       <span className="text-[7px] font-black italic text-gray-700 leading-none">{formatDuration(student.total_time)}</span>
-                    </div>
-                  </td>
+                  <th className="border-2 border-black p-1.5 text-[11px] font-black uppercase leading-tight text-center bg-gray-800 text-white w-[7.6%]">
+                    GENEL TOPLAM
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
-    </div>
+              </thead>
+              <tbody className="text-left font-bold">
+                {studentGroup.map((student, idx) => (
+                  <tr key={idx} className="text-center hover:bg-gray-50 leading-tight border-b border-black">
+                    {/* ÖĞRENCİ BİLGİSİ */}
+                    <td className="border-2 border-black p-2 text-[10px] font-black text-left uppercase leading-tight break-words">
+                      {student.full_name}
+                      <span className="block text-[8px] font-normal text-gray-500 lowercase mt-0.5 truncate">
+                        {student.email}
+                      </span>
+                    </td>
+
+                    {/* ÖN TEST */}
+                    <td className="border-2 border-black p-1.5 text-[10px] font-black text-center italic bg-gray-50/50">
+                      {student.pre_test_score || "-"}
+                    </td>
+
+                    {/* HAFTALIK VERİLER (H.1 - H.14) */}
+                    {student.weekly_breakdown.map((week, wIdx) => (
+                      <td
+                        key={wIdx}
+                        className="border-2 border-black p-1 text-[9px] font-bold leading-tight align-top overflow-hidden"
+                      >
+                        <div className="flex flex-col gap-1 h-full justify-between">
+                          {/* TUR 1 BAŞARI & D/Y & HAFTALIK SÜRE ROZETİ */}
+                          <div className="flex flex-col border-b border-gray-300 pb-1 w-full items-center bg-blue-50/20 rounded-sm p-0.5">
+                            <div className="flex justify-between w-full px-0.5 mb-0.5">
+                              <span className="text-gray-500 font-black text-[8px]">T1</span>
+                              <span className="text-blue-700 font-black text-[10px]">%{Math.round(week.progress)}</span>
+                            </div>
+                            <div className="flex flex-col items-center gap-0.5 w-full">
+                              <span className="text-[8.5px] text-gray-800 font-bold">{week.correct}D / {week.wrong}Y</span>
+                              <span className="text-[8.5px] text-blue-700 font-black bg-blue-100/80 px-1 py-0.5 rounded w-full text-center">
+                                T1: {formatDuration(week.duration_seconds)}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* MATERYALLER LİSTESİ */}
+                          <div className="flex flex-col gap-0.5 px-0.5 my-1">
+                            <p className="text-[8px] font-black text-gray-500 uppercase border-b border-gray-100 mb-0.5 text-left">
+                              Materyaller:
+                            </p>
+                            {week.material_details && week.material_details.length > 0 ? (
+                              week.material_details.map((mat, mi) => (
+                                <div
+                                  key={mi}
+                                  className="flex flex-col text-[8px] text-gray-700 leading-tight mb-1 border-b border-gray-50 pb-0.5"
+                                >
+                                  <span className="text-left font-semibold break-words">• {mat.title}</span>
+                                  <span className="font-bold text-[7.5px] text-red-700">
+                                    [T1: {formatDuration(mat.duration_seconds_t1 || 0)} | T2: {mat.duration_seconds_t2 ? formatDuration(mat.duration_seconds_t2) : '-'}]
+                                  </span>
+                                </div>
+                              ))
+                            ) : (
+                              <span className="text-[7.5px] text-gray-400 italic text-center">Yok</span>
+                            )}
+                          </div>
+
+                          {/* TUR 2 VERİLERİ (VARS A) */}
+                          {week.is_round_2_started ? (
+                            <div className="flex flex-col w-full items-center pt-1 border-t border-amber-300 bg-amber-50/50 rounded-sm p-0.5 mt-auto">
+                              <span className="text-amber-800 font-black text-[8px]">T2 PEKİŞTİRME</span>
+                              <span className="text-green-700 font-bold text-[8.5px]">{week.correct_2}D / {week.wrong_2}Y</span>
+                              <span className="text-[8.5px] text-amber-800 font-black bg-amber-100 px-1 py-0.5 rounded w-full text-center">
+                                T2: {formatDuration(week.duration_seconds_2)}
+                              </span>
+                            </div>
+                          ) : null}
+                        </div>
+                      </td>
+                    ))}
+
+                    {/* GENEL TOPLAM KOLONU */}
+                    <td className="border-2 border-black p-1.5 bg-gray-100 align-middle">
+                      <div className="flex flex-col items-center justify-center gap-1 leading-tight">
+                        <span className="text-[11px] font-black text-blue-900 leading-none">
+                          {student.total_points} PUAN
+                        </span>
+                        <div className="w-full border-t border-black/20 my-1"></div>
+                        <span className="text-[8.5px] font-bold text-gray-700 leading-tight">
+                          T1: {formatDuration(student.total_time_t1 || 0)}
+                        </span>
+                        <span className="text-[8.5px] font-bold text-amber-800 leading-tight">
+                          T2: {formatDuration(student.total_time_t2 || 0)}
+                        </span>
+                        <span className="text-[9.5px] font-black text-black leading-tight bg-white px-1 py-0.5 rounded border border-gray-300 w-full text-center mt-0.5">
+                          TOP: {formatDuration(student.total_time)}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+    </>
   );
 };
