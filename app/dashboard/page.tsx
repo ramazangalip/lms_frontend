@@ -36,7 +36,7 @@ export default function StudentDashboard() {
   const [userTotalPoints, setUserTotalPoints] = useState(0);
   const trackingInterval = useRef<NodeJS.Timeout | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
-  const [quizResult, setQuizResult] = useState<{ score: number; correct: number; wrong: number } | null>(null);
+  const [quizResult, setQuizResult] = useState<{ score: number; correct: number; wrong: number; predicted_score?: number; calibration_gap?: number } | null>(null);
   const [quizSubmitting, setQuizSubmitting] = useState(false);
   const [currentAttemptId, setCurrentAttemptId] = useState<string | null>(null);
   const [isAnalysisModalOpen, setIsAnalysisModalOpen] = useState(false);
@@ -389,7 +389,7 @@ export default function StudentDashboard() {
     }
   };
 
-  const handleQuizSubmit = async () => {
+  const handleQuizSubmit = async (predictedScore?: number) => {
     const quizId = activeMaterial?.quiz?.id;
     if (!quizId || String(quizId) === 'undefined' || String(quizId) === 'null') {
       alert("Sınav verisi bulunamadı.");
@@ -407,12 +407,17 @@ export default function StudentDashboard() {
         option_id: String(oId),
       }));
 
-      const res = await api.post(`/contents/quiz/${String(quizId)}/submit/`, { answers });
+      const res = await api.post(`/contents/quiz/${String(quizId)}/submit/`, {
+        answers,
+        predicted_score: predictedScore !== undefined ? predictedScore : 80
+      });
 
       setQuizResult({
         score: res.data.score,
         correct: res.data.correct,
         wrong: res.data.wrong,
+        predicted_score: res.data.predicted_score,
+        calibration_gap: res.data.calibration_gap,
       });
       setCurrentAttemptId(String(res.data.attempt_id));
 

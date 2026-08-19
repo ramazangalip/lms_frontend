@@ -10,7 +10,8 @@ import {
   AlertCircle,
   MessageSquare,
   Bot,
-  Clock
+  Clock,
+  Target
 } from 'lucide-react';
 import { StudentAnalytics, getDeptName, formatDuration } from '../types';
 
@@ -115,6 +116,36 @@ export const StudentReportModal: React.FC<StudentReportModalProps> = ({
                         </span>
                       </div>
                     ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ÜSTBİLİŞSEL KALİBRASYON BİLGİSİ */}
+              {(week.predicted_score_1 !== undefined || week.predicted_score_2 !== undefined) && (
+                <div className="space-y-2 border-t border-gray-200 pt-4">
+                  <div className="flex items-center gap-2 text-secondary leading-none mb-1">
+                    <Target size={16} className="text-amber-500" />
+                    <p className="text-[10px] font-black uppercase tracking-widest leading-none">
+                      Üstbilişsel Kalibrasyon Detayı (Tahmin / Gerçek Skor / Sapma)
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    {week.predicted_score_1 !== undefined && week.predicted_score_1 !== null && (
+                      <div className="p-3 bg-amber-50/60 rounded-xl border border-amber-200 flex justify-between items-center">
+                        <span className="font-bold text-amber-900">• Tur 1 Kalibrasyon:</span>
+                        <span className="font-black text-[10px] text-amber-800">
+                          Tahmin: %{week.predicted_score_1} | Skor: %{week.score_1} | Sapma: ±{week.calibration_gap_1} P.
+                        </span>
+                      </div>
+                    )}
+                    {week.predicted_score_2 !== undefined && week.predicted_score_2 !== null && (
+                      <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-200 flex justify-between items-center">
+                        <span className="font-bold text-blue-900">• Tur 2 Kalibrasyon:</span>
+                        <span className="font-black text-[10px] text-blue-800">
+                          Tahmin: %{week.predicted_score_2} | Skor: %{week.score_2} | Sapma: ±{week.calibration_gap_2} P.
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

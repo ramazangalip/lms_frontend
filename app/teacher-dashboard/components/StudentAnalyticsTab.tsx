@@ -8,9 +8,10 @@ import {
   Clock,
   Search,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Target
 } from 'lucide-react';
-import { StudentAnalytics, getDeptName, departmentList } from '../types';
+import { StudentAnalytics, getDeptName, departmentList, formatDuration } from '../types';
 
 interface StudentAnalyticsTabProps {
   totalCount: number;
@@ -23,6 +24,11 @@ interface StudentAnalyticsTabProps {
   handlePrintAcademic: () => void;
   setSelectedStudent: (student: StudentAnalytics | null) => void;
   loading: boolean;
+  deptSummary?: {
+    avg_calibration_gap: number;
+    avg_t1_duration_seconds: number;
+    avg_t2_duration_seconds: number;
+  };
 }
 
 export const StudentAnalyticsTab: React.FC<StudentAnalyticsTabProps> = ({
@@ -35,7 +41,8 @@ export const StudentAnalyticsTab: React.FC<StudentAnalyticsTabProps> = ({
   fetchAnalytics,
   handlePrintAcademic,
   setSelectedStudent,
-  loading
+  loading,
+  deptSummary
 }) => {
   return (
     <div className="animate-in slide-in-from-bottom-4 duration-500 space-y-6 md:space-y-8 pb-10 text-left">
@@ -76,6 +83,8 @@ export const StudentAnalyticsTab: React.FC<StudentAnalyticsTabProps> = ({
           </button>
         </div>
       </div>
+
+
 
       {/* Analiz Tablosu */}
       <div className="bg-white rounded-3xl md:rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden text-left">

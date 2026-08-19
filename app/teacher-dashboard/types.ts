@@ -74,6 +74,10 @@ export interface WeeklyProgress {
   duration_2?: string | number;
   score_1?: number;
   score_2?: number;
+  predicted_score_1?: number | null;
+  calibration_gap_1?: number | null;
+  predicted_score_2?: number | null;
+  calibration_gap_2?: number | null;
   correct_1?: number;
   wrong_1?: number;
   correct_2?: number;
@@ -112,6 +116,10 @@ export interface BulkStudentData {
     wrong_2: number;
     score_1?: number;
     score_2?: number;
+    predicted_score_1?: number | null;
+    calibration_gap_1?: number | null;
+    predicted_score_2?: number | null;
+    calibration_gap_2?: number | null;
     has_quiz: boolean;
     is_round_2_started: boolean;
     quiz_results?: QuizDetailAnalysis[];

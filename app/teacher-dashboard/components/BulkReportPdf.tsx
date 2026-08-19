@@ -130,6 +130,13 @@ export const BulkReportPdf: React.FC<BulkReportPdfProps> = ({
                             </div>
                           </div>
 
+                          {/* KALİBRASYON GÖSTERGESİ (VARSA) */}
+                          {week.predicted_score_1 !== undefined && week.predicted_score_1 !== null ? (
+                            <div className="text-[7.5px] font-bold text-amber-900 bg-amber-50 px-1 py-0.5 rounded border border-amber-200 text-center my-0.5">
+                              Tahmin: %{week.predicted_score_1} | Gerçek: %{week.score_1} | Sapma: ±{week.calibration_gap_1}
+                            </div>
+                          ) : null}
+
                           {/* MATERYALLER LİSTESİ */}
                           <div className="flex flex-col gap-0.5 px-0.5 my-1">
                             <p className="text-[8px] font-black text-gray-500 uppercase border-b border-gray-100 mb-0.5 text-left">
