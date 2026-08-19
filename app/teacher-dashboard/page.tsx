@@ -146,20 +146,33 @@ export default function TeacherDashboard() {
     }
   }, [selectedDepartment]);
 
-  // --- 3. ANKET ANALİZ SONUÇLARINI ÇEKME ---
-  const fetchSurveyAnalytics = useCallback(async (dept = selectedDepartment) => {
+  const [surveyPage, setSurveyPage] = useState(1);
+  const [surveyTotalCount, setSurveyTotalCount] = useState(0);
+
+  // --- 3. ANKET ANALİZ SONUÇLARINI ÇEKME (3'er öğrenci bazlı sayfalanmış) ---
+  const fetchSurveyAnalytics = useCallback(async (dept = selectedDepartment, page = surveyPage) => {
     if (!dept || dept === 'all') return;
     setLoading(true);
     try {
-      const res = await api.get(`/contents/academic/surveys/report/?department=${dept}&survey_id=${selectedSurveyId}`);
-      setSurveyAnalysis(res.data);
+      const res = await api.get(`/contents/academic/surveys/report/?department=${dept}&survey_id=${selectedSurveyId}&page=${page}`);
+      if (res.data && res.data.results) {
+        setSurveyAnalysis(res.data.results);
+        setSurveyTotalCount(res.data.count);
+      } else if (Array.isArray(res.data)) {
+        setSurveyAnalysis(res.data);
+        setSurveyTotalCount(res.data.length);
+      } else {
+        setSurveyAnalysis([]);
+        setSurveyTotalCount(0);
+      }
     } catch (err) {
       console.error("Anket analizleri çekilemedi:", err);
       setSurveyAnalysis([]);
+      setSurveyTotalCount(0);
     } finally {
       setLoading(false);
     }
-  }, [selectedDepartment, selectedSurveyId]);
+  }, [selectedDepartment, selectedSurveyId, surveyPage]);
 
   // Sekme ve bölüm değişiminde veri tetikleme
   useEffect(() => {
@@ -172,9 +185,9 @@ export default function TeacherDashboard() {
       fetchChatbotAnalytics(selectedDepartment);
     }
     if (activeTab === 'survey_results') {
-      fetchSurveyAnalytics(selectedDepartment); 
+      fetchSurveyAnalytics(selectedDepartment, surveyPage); 
     }
-  }, [activeTab, selectedDepartment, currentPage, fetchAnalytics, fetchChatbotAnalytics, fetchSurveyAnalytics]);
+  }, [activeTab, selectedDepartment, currentPage, surveyPage, selectedSurveyId, fetchAnalytics, fetchChatbotAnalytics, fetchSurveyAnalytics]);
 
   // Anket Soru İşlemleri
   const addSurveyQuestion = () => {
@@ -769,6 +782,10 @@ export default function TeacherDashboard() {
             setSelectedSurveyId={setSelectedSurveyId}
             surveyAnalysis={surveyAnalysis}
             loading={loading}
+            surveyPage={surveyPage}
+            setSurveyPage={setSurveyPage}
+            surveyTotalCount={surveyTotalCount}
+            fetchSurveyAnalytics={fetchSurveyAnalytics}
           />
         )}
 

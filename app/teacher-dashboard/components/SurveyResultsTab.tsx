@@ -1,9 +1,11 @@
 "use client";
-import React from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Filter,
   ListChecks,
-  FileText
+  FileText,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { SurveyAnalysisResult, departmentList } from '../types';
 
@@ -14,6 +16,10 @@ interface SurveyResultsTabProps {
   setSelectedSurveyId: (id: string) => void;
   surveyAnalysis: SurveyAnalysisResult[];
   loading: boolean;
+  surveyPage: number;
+  setSurveyPage: (page: number) => void;
+  surveyTotalCount: number;
+  fetchSurveyAnalytics: (dept?: string, page?: number) => void;
 }
 
 export const SurveyResultsTab: React.FC<SurveyResultsTabProps> = ({
@@ -22,88 +28,129 @@ export const SurveyResultsTab: React.FC<SurveyResultsTabProps> = ({
   selectedSurveyId,
   setSelectedSurveyId,
   surveyAnalysis,
-  loading
+  loading,
+  surveyPage,
+  setSurveyPage,
+  surveyTotalCount,
+  fetchSurveyAnalytics
 }) => {
-  const surveyDataArray = Array.isArray(surveyAnalysis) ? surveyAnalysis : [];
-  const totalResponses = surveyDataArray.length;
-  
-  const totalScore = surveyDataArray.reduce((acc: number, curr: any) => {
-    const val = Number(curr.answer);
-    return acc + (!isNaN(val) ? val : 0);
-  }, 0);
-  
-  const generalAverage = totalResponses > 0 ? (Math.round((totalScore / totalResponses) * 100) / 100) : 0;
-  const dynamicPercentage = totalResponses > 0 ? Math.round((generalAverage / 5) * 100) : 0;
+  // Tablo sayfalama state'i (DOM kasılmasını önlemek için 15 elemanlık dilimleme)
+  const [tablePage, setTablePage] = useState<number>(1);
+  const TABLE_PAGE_SIZE = 15;
 
-  const answerCounts: { [key: number]: number } = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-  
-  const fallbackLabels: { [key: number]: string } = {
-    1: "Hiçbir zaman",
-    2: "Ender olarak",
-    3: "Bazen",
-    4: "Sıklıkla",
-    5: "Her zaman"
-  };
+  // Filtre değiştiğinde tablo sayfasını 1'e sıfırla
+  useEffect(() => {
+    setTablePage(1);
+  }, [selectedDepartment, selectedSurveyId]);
 
-  const dynamicLikertLabels: { [key: number]: string } = { ...fallbackLabels };
+  const surveyDataArray = useMemo(() => {
+    return Array.isArray(surveyAnalysis) ? surveyAnalysis : [];
+  }, [surveyAnalysis]);
 
-  const questionsMap: { [key: string]: { 
-    questionText: string; 
-    category: string;
-    responsesCount: number;
-    counts: { [key: number]: number }; 
-    labels: { [key: number]: string }; 
-  }} = {};
+  // HESAPLAMALAR VE ANALİZLER (useMemo ile tek seferde hesaplanır, gereksiz re-render engellenir)
+  const {
+    totalResponses,
+    generalAverage,
+    dynamicPercentage,
+    groupedQuestions,
+    timeDataArray,
+    dynamicLikertLabels,
+    fallbackLabels
+  } = useMemo(() => {
+    const totalResp = surveyDataArray.length;
 
-  const studentParticipationMap: { [key: string]: { studentName: string; item_count: number } } = {};
+    const totalScore = surveyDataArray.reduce((acc: number, curr: any) => {
+      const val = Number(curr.answer);
+      return acc + (!isNaN(val) ? val : 0);
+    }, 0);
 
-  surveyDataArray.forEach((item: any) => {
-    const qText = item.question || "Soru Maddesi Eksik";
-    const finalScore = Number(item.answer) || 0;
-    const cat = item.category || "Genel";
-    const studentName = item.student || "Bilinmeyen Öğrenci";
+    const genAvg = totalResp > 0 ? Math.round((totalScore / totalResp) * 100) / 100 : 0;
+    const dynPct = totalResp > 0 ? Math.round((genAvg / 5) * 100) : 0;
 
-    if (!studentParticipationMap[studentName]) {
-      studentParticipationMap[studentName] = { studentName, item_count: 0 };
-    }
-    studentParticipationMap[studentName].item_count += 1;
+    const fallbacks: { [key: number]: string } = {
+      1: "Hiçbir zaman",
+      2: "Ender olarak",
+      3: "Bazen",
+      4: "Sıklıkla",
+      5: "Her zaman"
+    };
 
-    if (!questionsMap[qText]) {
-      questionsMap[qText] = {
-        questionText: qText,
-        category: cat,
-        responsesCount: 0,
-        counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
-        labels: { ...fallbackLabels }
-      };
-    }
+    const likertLabels: { [key: number]: string } = { ...fallbacks };
 
-    if (finalScore >= 1 && finalScore <= 5) {
-      questionsMap[qText].counts[finalScore]++;
-      questionsMap[qText].responsesCount++;
-      answerCounts[finalScore]++;
-      
-      const isTextClean = item.answer_text && 
-                           !item.answer_text.includes("Hata") && 
-                           item.answer_text !== "null" && 
-                           item.answer_text.trim() !== "";
-      if (isTextClean) {
-        dynamicLikertLabels[finalScore] = item.answer_text;
-        questionsMap[qText].labels[finalScore] = item.answer_text;
+    const questionsMap: { [key: string]: { 
+      questionText: string; 
+      category: string;
+      responsesCount: number;
+      counts: { [key: number]: number }; 
+      labels: { [key: number]: string }; 
+    }} = {};
+
+    const studentParticipationMap: { [key: string]: { studentName: string; item_count: number } } = {};
+
+    surveyDataArray.forEach((item: any) => {
+      const qText = item.question || "Soru Maddesi Eksik";
+      const finalScore = Number(item.answer) || 0;
+      const cat = item.category || "Genel";
+      const studentName = item.student || "Bilinmeyen Öğrenci";
+
+      if (!studentParticipationMap[studentName]) {
+        studentParticipationMap[studentName] = { studentName, item_count: 0 };
       }
-    }
-  });
+      studentParticipationMap[studentName].item_count += 1;
 
-  const groupedQuestions = Object.values(questionsMap);
+      if (!questionsMap[qText]) {
+        questionsMap[qText] = {
+          questionText: qText,
+          category: cat,
+          responsesCount: 0,
+          counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+          labels: { ...fallbacks }
+        };
+      }
 
-  const timeDataArray = Object.values(studentParticipationMap)
-    .sort((a, b) => b.item_count - a.item_count)
-    .map((item, idx) => ({
-      rank: idx + 1,
-      student: item.studentName,
-      department: selectedDepartment ? String(selectedDepartment).toUpperCase() : "ÇOCUK GELİŞİMİ",
-      total_time: `${(item.item_count * 1.2).toFixed(1)} Saat`
-    }));
+      if (finalScore >= 1 && finalScore <= 5) {
+        questionsMap[qText].counts[finalScore]++;
+        questionsMap[qText].responsesCount++;
+        
+        const isTextClean = item.answer_text && 
+                             !item.answer_text.includes("Hata") && 
+                             item.answer_text !== "null" && 
+                             item.answer_text.trim() !== "";
+        if (isTextClean) {
+          likertLabels[finalScore] = item.answer_text;
+          questionsMap[qText].labels[finalScore] = item.answer_text;
+        }
+      }
+    });
+
+    const gQuestions = Object.values(questionsMap);
+
+    const tDataArray = Object.values(studentParticipationMap)
+      .sort((a, b) => b.item_count - a.item_count)
+      .map((item, idx) => ({
+        rank: idx + 1,
+        student: item.studentName,
+        department: selectedDepartment ? String(selectedDepartment).toUpperCase() : "ÇOCUK GELİŞİMİ",
+        total_time: `${(item.item_count * 1.2).toFixed(1)} Saat`
+      }));
+
+    return {
+      totalResponses: totalResp,
+      generalAverage: genAvg,
+      dynamicPercentage: dynPct,
+      groupedQuestions: gQuestions,
+      timeDataArray: tDataArray,
+      dynamicLikertLabels: likertLabels,
+      fallbackLabels: fallbacks
+    };
+  }, [surveyDataArray, selectedDepartment]);
+
+  // TABLO İÇİN SAYFALANMIŞ VERİ (DOM YÜKÜNÜ 3000 SATIRDAN 15 SATIRA DÜŞÜRÜR)
+  const totalTablePages = Math.ceil(totalResponses / TABLE_PAGE_SIZE) || 1;
+  const paginatedResponses = useMemo(() => {
+    const start = (tablePage - 1) * TABLE_PAGE_SIZE;
+    return surveyDataArray.slice(start, start + TABLE_PAGE_SIZE);
+  }, [surveyDataArray, tablePage]);
 
   const exportSurveyPDF = async () => {
     const { jsPDF } = await import('jspdf');
@@ -266,6 +313,44 @@ export const SurveyResultsTab: React.FC<SurveyResultsTabProps> = ({
         </div>
       </div>
 
+      {/* 3'ER ÖĞRENCİLİ AKADEMİK SAYFALAMA KONTROL BARI */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-5 rounded-3xl border border-purple-100 shadow-xl text-left">
+        <div className="text-xs font-black text-purple-950 uppercase tracking-widest flex items-center gap-2">
+          <span className="w-2.5 h-2.5 bg-purple-600 rounded-full animate-pulse"></span>
+          Öğrenci Sayfası {surveyPage} <span className="text-gray-400 font-bold text-[10px] uppercase">(Toplam {surveyTotalCount} Öğrenci)</span>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <button
+            disabled={surveyPage === 1 || loading}
+            onClick={() => {
+              const prevPage = Math.max(surveyPage - 1, 1);
+              setSurveyPage(prevPage);
+              fetchSurveyAnalytics(selectedDepartment, prevPage);
+            }}
+            className="px-4 py-2.5 rounded-xl bg-purple-50 text-purple-950 border border-purple-100 disabled:opacity-30 hover:bg-purple-100 font-black transition-all active:scale-95 flex items-center gap-1.5 text-[11px] uppercase tracking-wider shadow-sm cursor-pointer"
+          >
+            <ChevronLeft size={16} /> Önceki 3 Öğrenci
+          </button>
+          
+          <div className="bg-purple-950 text-white px-5 py-2.5 rounded-xl text-[11px] font-black tracking-widest shadow-md">
+            SAYFA {surveyPage}
+          </div>
+
+          <button
+            disabled={(surveyTotalCount > 0 && surveyPage * 3 >= surveyTotalCount) || loading}
+            onClick={() => {
+              const nextPage = surveyPage + 1;
+              setSurveyPage(nextPage);
+              fetchSurveyAnalytics(selectedDepartment, nextPage);
+            }}
+            className="px-4 py-2.5 rounded-xl bg-purple-50 text-purple-950 border border-purple-100 disabled:opacity-30 hover:bg-purple-100 font-black transition-all active:scale-95 flex items-center gap-1.5 text-[11px] uppercase tracking-wider shadow-sm cursor-pointer"
+          >
+            Sonraki 3 Öğrenci <ChevronRight size={16} />
+          </button>
+        </div>
+      </div>
+
       {/* ÜST İSTATİSTİK KARTLARI PANELİ */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-gradient-to-br from-purple-900 to-indigo-950 p-6 rounded-3xl shadow-xl text-white text-left flex flex-col justify-between">
@@ -311,11 +396,11 @@ export const SurveyResultsTab: React.FC<SurveyResultsTabProps> = ({
         </div>
       </div>
 
-      {/* ÖĞRENCİ BAZLI DETAYLI VERİ TABLOSU */}
+      {/* ÖĞRENCİ BAZLI DETAYLI VERİ TABLOSU (SAYFALANDIRILMIŞ VE DOM DARBOĞAZI ÇÖZÜLMÜŞ) */}
       <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 overflow-hidden text-left">
-        <div className="p-6 border-b bg-purple-50/20 flex justify-between items-center">
+        <div className="p-6 border-b bg-purple-50/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <h2 className="font-black text-purple-950 uppercase text-xs tracking-widest flex items-center gap-2 leading-none">
-            <ListChecks size={18} className="text-purple-600" /> Öğrenci Bazlı Ölçek Veritabanı Maddeleri
+            <ListChecks size={18} className="text-purple-600" /> Öğrenci Bazlı Ölçek Veritabanı Maddeleri ({totalResponses} Yanıt)
           </h2>
           <button 
             onClick={exportSurveyPDF}
@@ -336,8 +421,8 @@ export const SurveyResultsTab: React.FC<SurveyResultsTabProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-bold">
-              {totalResponses > 0 ? (
-                surveyDataArray.map((item: any, si: number) => {
+              {paginatedResponses.length > 0 ? (
+                paginatedResponses.map((item: any, si: number) => {
                   const finalScore = Number(item.answer) || 0;
                   const isTextValid = item.answer_text && 
                                       !item.answer_text.includes("Hata") && 
@@ -371,6 +456,34 @@ export const SurveyResultsTab: React.FC<SurveyResultsTabProps> = ({
             </tbody>
           </table>
         </div>
+
+        {/* SAYFALAMA KONTROL BARI (TABLO DOM DARBOĞAZINI ENGELLEMEK İÇİN) */}
+        {totalResponses > TABLE_PAGE_SIZE && (
+          <div className="p-4 border-t bg-gray-50/60 flex items-center justify-between">
+            <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">
+              Toplam {totalResponses} maddeden {(tablePage - 1) * TABLE_PAGE_SIZE + 1} - {Math.min(tablePage * TABLE_PAGE_SIZE, totalResponses)} arası gösteriliyor
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={tablePage === 1 || loading}
+                onClick={() => setTablePage(prev => Math.max(prev - 1, 1))}
+                className="p-2 rounded-lg bg-white border border-gray-200 text-purple-950 disabled:opacity-30 hover:bg-gray-100 transition-all active:scale-90"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-xs font-black text-purple-950 px-3 py-1 bg-white border rounded-lg">
+                Sayfa {tablePage} / {totalTablePages}
+              </span>
+              <button
+                disabled={tablePage >= totalTablePages || loading}
+                onClick={() => setTablePage(prev => Math.min(prev + 1, totalTablePages))}
+                className="p-2 rounded-lg bg-white border border-gray-200 text-purple-950 disabled:opacity-30 hover:bg-gray-100 transition-all active:scale-90"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* SİSTEMDE EN ÇOK KALAN ÖĞRENCİLER ANALİZ VE PDF PANELİ */}
