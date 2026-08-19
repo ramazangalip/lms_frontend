@@ -2,18 +2,34 @@
 
 import React, { useEffect, useState } from 'react';
 import * as Icons from 'lucide-react';
+import {
+  ArrowLeft,
+  User as UserIcon,
+  GraduationCap,
+  Award,
+  Check,
+  Lock,
+  TrendingUp,
+  Target,
+  Activity,
+  BookOpen,
+  Sparkles,
+  CheckCircle2,
+  ShieldCheck,
+  BarChart3
+} from 'lucide-react';
 import api from '@/lib/api';
 import Link from 'next/link';
 
-// --- Veri Yapıları (Interface) ---
 interface Badge {
   id: number;
   name: string;
   description: string;
   icon_name: string;
-  color: string;
+  color?: string;
   requirement_text: string;
   is_earned: boolean;
+  earned_at?: string | null;
 }
 
 interface UserProfile {
@@ -21,220 +37,396 @@ interface UserProfile {
   last_name: string;
   department: string;
   total_points: number;
+  last_test_score?: number | null;
 }
 
-interface LeaderboardStudent {
-  rank: number;
-  full_name: string;
-  total_points: number;
-  is_me: boolean;
-}
-
-interface LeaderboardData {
-  department_name: string;
-  students: LeaderboardStudent[];
+interface WeeklyContent {
+  id: number | string;
+  week_number: number;
+  title: string;
+  progress: number;
+  is_completed: boolean;
 }
 
 export default function ProfilePage() {
   const [badges, setBadges] = useState<Badge[]>([]);
   const [user, setUser] = useState<UserProfile | null>(null);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardData | null>(null);
+  const [contents, setContents] = useState<WeeklyContent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Profil Bilgileri
-    api.get('/users/profile/')
-      .then(res => setUser(res.data))
-      .catch(err => console.error("Profil hatası:", err));
-
-    // 2. Bölüm Liderlik Tablosu (İlk 5)
-    api.get('/users/leaderboard/')
-      .then(res => setLeaderboard(res.data))
-      .catch(err => console.error("Liderlik tablosu hatası:", err));
-
-    // 3. Rozetler
-    api.get('/contents/student-badges/')
-      .then(res => setBadges(res.data))
-      .catch(err => console.error("Rozet hatası:", err))
+    Promise.all([
+      api.get('/users/profile/').catch(() => null),
+      api.get('/contents/list/').catch(() => null),
+      api.get('/contents/student-badges/').catch(() => null)
+    ])
+      .then(([profileRes, contentsRes, badgesRes]) => {
+        if (profileRes?.data) setUser(profileRes.data);
+        if (contentsRes?.data) setContents(contentsRes.data);
+        if (badgesRes?.data) setBadges(badgesRes.data);
+      })
+      .catch((err) => console.error("Veri yükleme hatası:", err))
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return (
-    <div className="flex h-screen items-center justify-center bg-white">
-      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-    </div>
-  );
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-white flex-col gap-4 text-secondary">
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-red-600 border-t-transparent"></div>
+        <p className="text-red-600 text-[10px] font-black uppercase tracking-widest animate-pulse">
+          YÜKLENİYOR...
+        </p>
+      </div>
+    );
+  }
+
+  // Metrik Hesaplamaları
+  const totalBadgesCount = badges.length;
+  const earnedBadgesCount = badges.filter((b) => b.is_earned).length;
+
+  const overallProgress =
+    contents.length > 0
+      ? Math.round(contents.reduce((acc, w) => acc + (w.progress || 0), 0) / contents.length)
+      : 0;
+
+  // Son Başarı Metrik Gösterimi (DB'den gelen last_test_score veya -)
+  const lastTestScoreDisplay =
+    user?.last_test_score !== undefined && user?.last_test_score !== null
+      ? `%${user.last_test_score}`
+      : `-`;
+
+  // Self-referenced Dinamik Feedback Metni
+  const getFeedbackMessage = () => {
+    if (overallProgress >= 80) {
+      return "Mükemmel performans! İlerlemen %80 üzerine ulaştı. Tüm ustalık hedeflerine ulaşmak üzeresin!";
+    }
+    if (overallProgress >= 50) {
+      return "Harika gelişim! Öğrenme hedeflerinin yarısından fazlasını tamamladın. İstikrarını sürdür!";
+    }
+    if (overallProgress > 0) {
+      return "İyi bir başlangıç! Düzenli çalışarak haftalık kazanımları tamamlayabilir ve rozetler kazanabilirsin.";
+    }
+    return "Öğrenme yolculuğuna başlamak için haftalık materyalleri ve bilgi testlerini tamamlayabilirsin.";
+  };
 
   return (
     <div className="min-h-screen bg-white p-4 md:p-8 font-sans text-black">
-      <div className="max-w-4xl mx-auto">
-        
-        {/* ÜST BAR: GERİ DÖN */}
-        <div className="flex justify-start mb-6">
-          <Link 
-            href="/dashboard" 
-            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-red-600 transition-all group"
+      <div className="max-w-5xl mx-auto space-y-10">
+
+        {/* ÜST BAR: GERİ DÖN VE SAYFA BAŞLIĞI */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-6">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-red-600 transition-all group w-fit"
           >
-            <div className="p-2 bg-gray-50 rounded-lg group-hover:bg-red-50">
-              <Icons.ArrowLeft size={14} />
+            <div className="p-2 bg-gray-50 rounded-xl group-hover:bg-red-50 transition-colors">
+              <ArrowLeft size={16} />
             </div>
-            Geri Dön
+            Ders Paneline Dön
           </Link>
-        </div>
 
-        {/* ÜST PANEL: KULLANICI KARTI */}
-        <div className="bg-black text-white rounded-2xl p-6 md:p-8 shadow-2xl mb-10 border-b-8 border-red-600 flex flex-col md:flex-row items-center gap-8">
-          <div className="w-20 h-20 bg-red-600 rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0 rotate-2">
-            <Icons.User size={40} className="-rotate-2" />
-          </div>
-
-          <div className="flex-1 text-center md:text-left">
-            <h1 className="text-3xl md:text-4xl font-black uppercase tracking-tighter leading-none mb-3">
-              {user?.first_name} {user?.last_name}
+          <div>
+            <h1 className="text-xl md:text-2xl font-black uppercase tracking-tighter text-black flex items-center gap-3">
+              <span className="bg-red-600 text-white p-2 rounded-xl shadow-lg shadow-red-600/20">
+                <BarChart3 size={20} />
+              </span>
+              BİREYSEL GELİŞİM PANELİ
             </h1>
-            <div className="inline-flex items-center gap-2 text-red-500 uppercase font-black text-[11px] tracking-[0.2em]">
-              <Icons.GraduationCap size={16} />
-              <span>{user?.department || "BİLGİSAYAR PROGRAMCILIĞI"}</span>
-            </div>
-          </div>
-
-          <div className="bg-white/5 border border-white/10 rounded-2xl px-8 py-4 text-center min-w-[140px]">
-            <div className="flex items-center justify-center gap-2 text-red-500 mb-2">
-              <Icons.Trophy size={16} fill="currentColor" />
-              <span className="text-[9px] font-black uppercase tracking-widest opacity-80">TOPLAM PUAN</span>
-            </div>
-            <p className="text-5xl font-black tabular-nums tracking-tighter text-white leading-none">
-              {user?.total_points || 0}
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right hidden md:block">
+              Öğrenme İlerlemem & Kişisel Başarı Analizi
             </p>
           </div>
         </div>
 
-        {/* LİDERLİK TABLOSU BÖLÜMÜ */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-6">
+        {/* ÜST PANEL: KULLANICI KARTI & 3 ÖZET METRİK */}
+        <div className="bg-black text-white rounded-3xl p-6 md:p-8 shadow-2xl border-b-8 border-red-600 flex flex-col lg:flex-row items-center justify-between gap-8">
+          
+          {/* SOL: PROFİL BİLGİSİ */}
+          <div className="flex items-center gap-5 shrink-0 w-full lg:w-auto">
+            <div className="w-20 h-20 bg-red-600 rounded-2xl flex items-center justify-center text-white shadow-xl shrink-0 rotate-2">
+              <UserIcon size={36} className="-rotate-2" />
+            </div>
+            <div>
+              <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tighter leading-none mb-2">
+                {user?.first_name} {user?.last_name}
+              </h2>
+              <div className="inline-flex items-center gap-2 text-red-500 uppercase font-black text-[10px] tracking-[0.2em] bg-white/5 px-3 py-1.5 rounded-lg border border-white/10">
+                <GraduationCap size={14} />
+                <span>{user?.department || "BİLGİSAYAR PROGRAMCILIĞI"}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* SAĞ: 3 ÖZET METRİK KARTI */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:w-auto">
+            {/* Metrik 1: Genel İlerleme */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center min-w-[130px] hover:bg-white/10 transition-all">
+              <div className="flex items-center justify-center gap-1.5 text-red-500 mb-1">
+                <Activity size={14} />
+                <span className="text-[8px] font-black uppercase tracking-widest opacity-80">Genel İlerleme</span>
+              </div>
+              <p className="text-3xl font-black tabular-nums tracking-tighter text-white leading-none">
+                %{overallProgress}
+              </p>
+            </div>
+
+            {/* Metrik 2: Son Hafta / Test Başarısı (DİNAMİK DB VERİSİ) */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center min-w-[130px] hover:bg-white/10 transition-all">
+              <div className="flex items-center justify-center gap-1.5 text-amber-400 mb-1">
+                <Target size={14} />
+                <span className="text-[8px] font-black uppercase tracking-widest opacity-80">Son Başarı</span>
+              </div>
+              <p className="text-3xl font-black tabular-nums tracking-tighter text-white leading-none">
+                {lastTestScoreDisplay}
+              </p>
+            </div>
+
+            {/* Metrik 3: Ustalık Rozetleri */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center min-w-[130px] hover:bg-white/10 transition-all">
+              <div className="flex items-center justify-center gap-1.5 text-green-400 mb-1">
+                <Award size={14} />
+                <span className="text-[8px] font-black uppercase tracking-widest opacity-80">Ustalık Rozetleri</span>
+              </div>
+              <p className="text-3xl font-black tabular-nums tracking-tighter text-white leading-none">
+                {earnedBadgesCount} <span className="text-sm font-bold text-gray-500">/ {totalBadgesCount}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ORTA BÖLÜM: BİREYSEL GELİŞİM & KAZANIM USTALIK DÜZEYLERİ */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* 1. HAFTALIK BİREYSEL GELİŞİM (SELF-REFERENCED PROGRESS) */}
+          <div className="bg-white rounded-3xl p-6 md:p-8 border-2 border-gray-100 shadow-sm flex flex-col justify-between space-y-6">
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-base font-black uppercase tracking-tighter flex items-center gap-2 text-black">
+                  <span className="bg-black text-white p-2 rounded-xl shadow-md">
+                    <TrendingUp size={18} />
+                  </span>
+                  Haftalık Bireysel Gelişim
+                </h3>
+                <span className="text-[9px] font-black bg-red-50 text-red-600 px-3 py-1 rounded-full uppercase tracking-widest">
+                  Kişisel Analiz
+                </span>
+              </div>
+
+              {/* Haftalık İlerleme Listesi */}
+              <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1 custom-scrollbar">
+                {contents.map((week) => (
+                  <div
+                    key={week.id}
+                    className="p-3 bg-gray-50/70 border border-gray-100 rounded-2xl flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="w-7 h-7 rounded-xl bg-black text-white font-black text-[10px] flex items-center justify-center shrink-0">
+                        {week.week_number}
+                      </span>
+                      <p className="text-xs font-bold text-gray-800 truncate">
+                        {week.title}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-3 shrink-0">
+                      <div className="w-24 bg-gray-200 h-2 rounded-full overflow-hidden hidden sm:block">
+                        <div
+                          className={`h-full transition-all duration-700 ${
+                            week.is_completed ? 'bg-green-500' : 'bg-red-600'
+                          }`}
+                          style={{ width: `${week.progress || 0}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] font-black text-black w-10 text-right">
+                        %{Math.round(week.progress || 0)}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Dynamic Self-referenced Feedback Box */}
+            <div className="bg-gradient-to-r from-red-600 to-black p-4 rounded-2xl text-white shadow-lg flex items-start gap-3 mt-4">
+              <div className="bg-white/10 p-2 rounded-xl shrink-0">
+                <Sparkles size={20} className="text-amber-300 animate-pulse" />
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-widest text-amber-300 mb-1">
+                  Bireysel Geri Bildirim
+                </p>
+                <p className="text-xs font-bold leading-relaxed">
+                  {getFeedbackMessage()}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. KAZANIM USTALIK DÜZEYLERİ (VERİTABANINDAKİ 14-15 HAFTALIK DERS BAŞLIKLARINA GÖRE DİNAMİK) */}
+          <div className="bg-white rounded-3xl p-6 md:p-8 border-2 border-gray-100 shadow-sm flex flex-col justify-between space-y-6">
+            <div>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-base font-black uppercase tracking-tighter flex items-center gap-2 text-black">
+                  <span className="bg-red-600 text-white p-2 rounded-xl shadow-md shadow-red-600/20">
+                    <ShieldCheck size={18} />
+                  </span>
+                  Kazanım Ustalık Düzeyleri
+                </h3>
+                <span className="text-[9px] font-black bg-gray-100 text-gray-500 px-3 py-1 rounded-full uppercase tracking-widest border">
+                  Haftalık Konular
+                </span>
+              </div>
+
+              {/* Veritabanından Gelen Haftalık Konu Başlıkları Ustalık Listesi */}
+              {contents.length > 0 ? (
+                <div className="space-y-3.5 max-h-[320px] overflow-y-auto pr-1 custom-scrollbar">
+                  {contents.map((week) => {
+                    const prog = Math.round(week.progress || 0);
+                    let statusLabel = "Başlanmadı";
+                    let badgeStyle = "bg-gray-100 text-gray-400 border-gray-200";
+                    let barColor = "bg-gray-300";
+
+                    if (prog >= 80) {
+                      statusLabel = "Ustalık Sağlandı";
+                      badgeStyle = "bg-green-50 text-green-600 border-green-200";
+                      barColor = "bg-green-500";
+                    } else if (prog >= 50) {
+                      statusLabel = "Geliştirilmeli";
+                      badgeStyle = "bg-amber-50 text-amber-600 border-amber-200";
+                      barColor = "bg-amber-500";
+                    } else if (prog > 0) {
+                      statusLabel = "Devam Ediyor";
+                      badgeStyle = "bg-blue-50 text-blue-600 border-blue-200";
+                      barColor = "bg-blue-500";
+                    }
+
+                    return (
+                      <div key={week.id} className="space-y-2 p-3 bg-gray-50/70 rounded-2xl border border-gray-100">
+                        <div className="flex justify-between items-start text-xs gap-3">
+                          <div className="min-w-0">
+                            <span className="font-black text-black block leading-snug truncate">
+                              {week.week_number}. Hafta: {week.title}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border ${badgeStyle}`}>
+                              {statusLabel}
+                            </span>
+                            <span className="font-black text-xs text-black w-8 text-right">
+                              %{prog}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden p-0.5 border border-gray-200/50">
+                          <div
+                            className={`h-full rounded-full transition-all duration-700 ${barColor}`}
+                            style={{ width: `${prog}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="py-12 text-center text-gray-400 font-bold text-xs uppercase tracking-widest">
+                  İçerik verisi bulunamadı.
+                </div>
+              )}
+            </div>
+
+            {/* Bilgilendirme Notu */}
+            <div className="bg-gray-50 border border-gray-100 p-4 rounded-2xl text-gray-600 flex items-center gap-3">
+              <BookOpen size={20} className="text-red-600 shrink-0" />
+              <p className="text-[10px] font-bold leading-normal">
+                Kazanım ustalık düzeylerin, materyal okumaları ve haftalık bilgi testlerinden elde ettiğin başarı puanlarına göre dinamik olarak güncellenir.
+              </p>
+            </div>
+          </div>
+
+        </div>
+
+        {/* ALT BÖLÜM: BAŞARI ROZETLERİ (DB DİNAMİK VERİSİ) */}
+        <div>
+          <div className="flex items-center gap-4 mb-6">
             <h2 className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-3 text-black">
-              <span className="bg-black text-white p-2 rounded-xl shadow-lg">
-                <Icons.ListOrdered size={20} />
-              </span> 
-              BÖLÜM SIRALAMASI
+              <span className="bg-red-600 text-white p-2.5 rounded-2xl shadow-lg shadow-red-600/20">
+                <Award size={22} />
+              </span>
+              BAŞARI ROZETLERİM
             </h2>
-            <span className="text-[10px] font-black bg-gray-100 px-4 py-1.5 rounded-full text-gray-500 uppercase tracking-widest border border-gray-200">
-              {leaderboard?.department_name || 'BÖLÜM ANALİZİ'}
+            <div className="h-[2px] flex-1 bg-gray-100"></div>
+            <span className="text-[10px] font-black bg-black text-white px-4 py-1.5 rounded-full uppercase tracking-widest">
+              {earnedBadgesCount} / {totalBadgesCount} KAZANILDI
             </span>
           </div>
 
-          <div className="bg-white rounded-2xl overflow-hidden border-2 border-gray-100 shadow-sm">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-black text-white text-[10px] font-black uppercase tracking-[0.2em]">
-                  <th className="px-6 py-4 w-20 text-center">Sıra</th>
-                  <th className="px-6 py-4">Öğrenci</th>
-                  <th className="px-6 py-4 text-right">Puan</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {leaderboard?.students.map((student) => (
-                  <tr 
-                    key={student.rank} 
-                    className={`transition-colors ${student.is_me ? 'bg-red-50/50' : 'hover:bg-gray-50'}`}
-                  >
-                    <td className="px-6 py-4 text-center">
-                      <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg font-black text-xs ${
-                        student.rank === 1 
-                          ? 'bg-red-600 text-white shadow-lg shadow-red-200' 
-                          : 'bg-gray-100 text-gray-400'
-                      }`}>
-                        {student.rank}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {badges.map((badge) => {
+              const iconKey = badge.icon_name as keyof typeof Icons;
+              const IconComponent = (Icons[iconKey] as React.ElementType) || Award;
+
+              return (
+                <div
+                  key={badge.id}
+                  className={`relative group p-5 rounded-3xl border-2 transition-all duration-300 flex flex-col justify-between min-h-[190px] ${
+                    badge.is_earned
+                      ? 'bg-white border-red-600 shadow-xl shadow-red-600/5 scale-[1.02]'
+                      : 'bg-gray-50/80 border-gray-100 opacity-60 grayscale hover:opacity-80'
+                  }`}
+                >
+                  <div>
+                    {/* Rozet İkonu */}
+                    <div
+                      className={`w-14 h-14 mx-auto mb-4 rounded-2xl flex items-center justify-center transition-transform group-hover:rotate-6 ${
+                        badge.is_earned
+                          ? 'bg-red-50 text-red-600 shadow-inner border border-red-100'
+                          : 'bg-gray-200 text-gray-400'
+                      }`}
+                    >
+                      <IconComponent size={28} strokeWidth={2.5} />
+                    </div>
+
+                    {/* Rozet Adı ve Açıklaması */}
+                    <div className="text-center">
+                      <h3
+                        className={`text-xs font-black uppercase tracking-tight mb-1.5 leading-tight ${
+                          badge.is_earned ? 'text-black' : 'text-gray-500'
+                        }`}
+                      >
+                        {badge.name}
+                      </h3>
+                      <p className="text-[9px] text-gray-400 font-bold leading-relaxed line-clamp-2">
+                        {badge.description || badge.requirement_text}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Alt Durum Göstergesi */}
+                  <div className="mt-4 pt-3 border-t border-gray-100 text-center">
+                    {badge.is_earned ? (
+                      <span className="inline-flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-green-600 bg-green-50 px-2.5 py-1 rounded-full border border-green-100">
+                        <CheckCircle2 size={10} /> Kazanıldı
                       </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <span className={`text-xs font-bold uppercase tracking-tight ${
-                          student.is_me ? 'text-red-600' : 'text-gray-800'
-                        }`}>
-                          {student.full_name}
-                        </span>
-                        {student.is_me && (
-                          <span className="text-[8px] bg-red-600 text-white px-2 py-0.5 rounded-md font-black uppercase tracking-tighter">
-                            Siz
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className={`text-sm font-black tabular-nums ${
-                        student.is_me ? 'text-red-600' : 'text-black'
-                      }`}>
-                        {student.total_points}
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
+                        <Lock size={10} /> Kilitli
                       </span>
-                    </td>
-                  </tr>
-                ))}
-                {(!leaderboard || leaderboard.students.length === 0) && (
-                  <tr>
-                    <td colSpan={3} className="px-6 py-10 text-center text-xs font-bold text-gray-400 uppercase tracking-widest">
-                      Sıralama verisi henüz oluşmadı.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                    )}
+                  </div>
+
+                  {/* Kazanıldı Onay Rozeti (Top-Right) */}
+                  {badge.is_earned && (
+                    <div className="absolute -top-2 -right-2 bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
+                      <Check size={12} strokeWidth={4} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* ROZETLER BÖLÜMÜ */}
-        <div className="flex items-center gap-4 mb-8">
-          <h2 className="text-xl font-black uppercase italic tracking-tighter flex items-center gap-3 text-black">
-            <span className="bg-red-600 text-white p-2 rounded-xl shadow-lg shadow-red-600/20">
-              <Icons.Award size={20} />
-            </span> 
-            BAŞARI ROZETLERİM
-          </h2>
-          <div className="h-[2px] flex-1 bg-gray-100"></div>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {badges.map((badge) => {
-            const iconKey = badge.icon_name as keyof typeof Icons;
-            const IconComponent = (Icons[iconKey] as React.ElementType) || Icons.Medal;
-            
-            return (
-              <div 
-                key={badge.id} 
-                className={`relative group p-5 rounded-2xl border-2 transition-all duration-300 flex flex-col justify-between min-h-[160px] ${
-                  badge.is_earned 
-                    ? 'bg-white border-red-600 shadow-xl shadow-red-600/5 scale-[1.02]' 
-                    : 'bg-gray-50 border-gray-100 opacity-40 grayscale hover:opacity-60'
-                }`}
-              >
-                <div>
-                  <div className={`w-12 h-12 mx-auto mb-4 rounded-xl flex items-center justify-center transition-transform group-hover:rotate-12 ${
-                    badge.is_earned ? 'bg-red-50 text-red-600' : 'bg-gray-200 text-gray-400'
-                  }`}>
-                    <IconComponent size={24} strokeWidth={2.5} />
-                  </div>
-
-                  <div className="text-center">
-                    <h3 className={`text-[11px] font-black uppercase tracking-tight mb-2 leading-tight ${
-                      badge.is_earned ? 'text-black' : 'text-gray-400'
-                    }`}>
-                      {badge.name}
-                    </h3>
-                    <p className="text-[9px] text-gray-500 font-bold leading-relaxed">
-                      {badge.is_earned ? badge.description : badge.requirement_text}
-                    </p>
-                  </div>
-                </div>
-
-                {badge.is_earned && (
-                  <div className="absolute -top-2 -right-2 bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center shadow-lg border-2 border-white">
-                    <Icons.Check size={12} strokeWidth={4} />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
       </div>
     </div>
   );
