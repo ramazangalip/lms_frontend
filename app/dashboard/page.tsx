@@ -112,6 +112,27 @@ export default function StudentDashboard() {
     };
   };
 
+  const fetchQuizLastAttempt = async (quizId: number | string | undefined | null) => {
+    // GUARD CLAUSE: Quiz ID null, undefined, 0 veya "undefined" ise ISTEK ATMA!
+    if (!quizId || String(quizId) === 'undefined' || String(quizId).trim() === '' || String(quizId) === 'null') {
+      return;
+    }
+
+    try {
+      const res = await api.get(`/contents/quiz/${quizId}/last-attempt/`);
+      if (res.data && res.data.id) {
+        setQuizResult({
+          score: res.data.score,
+          correct: res.data.correct,
+          wrong: res.data.wrong
+        });
+        setCurrentAttemptId(String(res.data.id));
+      }
+    } catch (qErr) {
+      console.log("Sınav son deneme verisi çekilemedi.");
+    }
+  };
+
   const handleSurveySubmit = async () => {
     if (!selectedWeek?.survey_data) return;
 
@@ -185,24 +206,18 @@ export default function StudentDashboard() {
 
       const currentWeek = selectedWeek || mergedData.sort((a: WeeklyContent, b: WeeklyContent) => a.week_number - b.week_number)[0];
       if (currentWeek) {
-        const quizMat = currentWeek.materials.find((m: Material) => m.content_type === 'form');
-        if (quizMat && stringifiedCompleted.includes(String(quizMat.id))) {
-          try {
-            const res = await api.get(`/contents/quiz/${quizMat.quiz?.id}/last-attempt/`);
-            if (res.data) {
-              setQuizResult({ score: res.data.score, correct: res.data.correct, wrong: res.data.wrong });
-              setCurrentAttemptId(String(res.data.id));
-            }
-          } catch (qErr) {
-            console.log("Sınav verisi çekilemedi.");
-          }
+        const quizMat = currentWeek.materials?.find((m: Material) => m.content_type === 'form');
+        const qId = quizMat?.quiz?.id;
+        if (qId && String(qId) !== 'undefined' && String(qId) !== 'null') {
+          await fetchQuizLastAttempt(qId);
         }
       }
 
       if (isInitialMount.current && mergedData.length > 0 && !selectedWeek) {
         const firstWeek = mergedData.sort((a: WeeklyContent, b: WeeklyContent) => a.week_number - b.week_number)[0];
+        setSelectedWeek(firstWeek);
+        setIsIntroView(true);
         isInitialMount.current = false;
-        handleWeekSelection(firstWeek);
       }
     } catch (err) {
       console.error("İçerik yükleme hatası:", err);
@@ -375,9 +390,13 @@ export default function StudentDashboard() {
   };
 
   const handleQuizSubmit = async () => {
-    if (!activeMaterial?.quiz) return;
-    const totalQs = activeMaterial.quiz.questions.length;
-    if (Object.keys(selectedAnswers).length < totalQs) {
+    const quizId = activeMaterial?.quiz?.id;
+    if (!quizId || String(quizId) === 'undefined' || String(quizId) === 'null') {
+      alert("Sınav verisi bulunamadı.");
+      return;
+    }
+    const totalQs = activeMaterial.quiz?.questions?.length || 0;
+    if (totalQs > 0 && Object.keys(selectedAnswers).length < totalQs) {
       alert("Lütfen tüm soruları cevaplayın.");
       return;
     }
@@ -388,7 +407,7 @@ export default function StudentDashboard() {
         option_id: String(oId),
       }));
 
-      const res = await api.post(`/contents/quiz/${String(activeMaterial.quiz.id)}/submit/`, { answers });
+      const res = await api.post(`/contents/quiz/${String(quizId)}/submit/`, { answers });
 
       setQuizResult({
         score: res.data.score,
@@ -419,7 +438,9 @@ export default function StudentDashboard() {
   };
 
   const handleFetchAIAnalysis = async () => {
-    if (!currentAttemptId) return;
+    if (!currentAttemptId || String(currentAttemptId) === 'undefined' || String(currentAttemptId) === 'null') {
+      return;
+    }
     setIsAnalysisLoading(true);
     setIsAnalysisModalOpen(true);
     setAiAnalysisFeedback("");
@@ -516,46 +537,36 @@ export default function StudentDashboard() {
     };
   }, [activeMaterial?.id, activeMaterial?.min_duration_seconds, isIntroView, completedMaterials.length, introStatus.isWatched]);
 
-  const handleWeekSelection = async (weekData: WeeklyContent) => {
+  // Aktif materyal bir Quiz (form) ise quiz.id nesnesi hazır olduğunda last-attempt çağrısı yap
+  useEffect(() => {
+    if (activeMaterial && activeMaterial.content_type === 'form') {
+      const qId = activeMaterial.quiz?.id;
+      if (qId && String(qId) !== 'undefined' && String(qId) !== 'null') {
+        fetchQuizLastAttempt(qId);
+      }
+    }
+  }, [activeMaterial?.id, activeMaterial?.quiz?.id]);
+
+  const handleWeekSelection = (weekData: WeeklyContent) => {
     if (weekData.is_locked) return;
-    setIsIntroView(false);
+    setSelectedWeek(weekData);
     setQuizResult(null);
     setSelectedAnswers({});
     setCurrentAttemptId(null);
-    setIsSidebarOpen(false);
+    setIsIntroView(false);
 
-    try {
-      const res = await api.get(`/contents/list/?week_number=${weekData.week_number}`);
-      const fullWeekData: WeeklyContent = res.data;
-      setSelectedWeek(fullWeekData);
-
-      const quizMat = fullWeekData.materials.find((m) => m.content_type === 'form');
-      if (quizMat && completedMaterials.includes(String(quizMat.id))) {
-        try {
-          const lastAttemptRes = await api.get(`/contents/quiz/${quizMat.quiz?.id}/last-attempt/`);
-          if (lastAttemptRes.data) {
-            setQuizResult({ score: lastAttemptRes.data.score, correct: lastAttemptRes.data.correct, wrong: lastAttemptRes.data.wrong });
-            setCurrentAttemptId(String(lastAttemptRes.data.id));
-          }
-        } catch (qErr) {
-          console.log("Sınav verisi çekilemedi.");
-        }
-      }
-
-      if (fullWeekData.materials && fullWeekData.materials.length > 0) {
-        setActiveMaterial(getSortedMaterials(fullWeekData.materials)[0]);
-      } else {
-        setActiveMaterial(null);
-      }
-    } catch (err) {
-      console.error("Hafta detay verisi çekilemedi:", err);
-      setSelectedWeek(weekData);
-      if (weekData.materials && weekData.materials.length > 0) {
-        setActiveMaterial(getSortedMaterials(weekData.materials)[0]);
-      } else {
-        setActiveMaterial(null);
-      }
+    const quizMat = weekData.materials?.find((m) => m.content_type === 'form');
+    const qId = quizMat?.quiz?.id;
+    if (qId && String(qId) !== 'undefined' && String(qId) !== 'null') {
+      fetchQuizLastAttempt(qId);
     }
+
+    if (weekData.materials && weekData.materials.length > 0) {
+      setActiveMaterial(getSortedMaterials(weekData.materials)[0]);
+    } else {
+      setActiveMaterial(null);
+    }
+    setIsSidebarOpen(false);
   };
 
   const handleCloseModalAndRefresh = async () => {
