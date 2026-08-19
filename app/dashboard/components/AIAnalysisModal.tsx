@@ -38,7 +38,7 @@ export const AIAnalysisModal: React.FC<AIAnalysisModalProps> = ({
             </div>
           </div>
           <button
-            onClick={() => setIsAnalysisModalOpen(false)}
+            onClick={handleCloseModalAndRefresh}
             className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-primary transition-all leading-none text-center"
           >
             <X size={24} className="text-left" />

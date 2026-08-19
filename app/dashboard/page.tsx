@@ -124,7 +124,9 @@ export default function StudentDashboard() {
         setQuizResult({
           score: res.data.score,
           correct: res.data.correct,
-          wrong: res.data.wrong
+          wrong: res.data.wrong,
+          predicted_score: res.data.predicted_score,
+          calibration_gap: res.data.calibration_gap,
         });
         setCurrentAttemptId(String(res.data.id));
       }
@@ -421,6 +423,39 @@ export default function StudentDashboard() {
       });
       setCurrentAttemptId(String(res.data.attempt_id));
 
+      const quizMatId = res.data.material_id || (activeMaterial ? String(activeMaterial.id) : null);
+      if (quizMatId) {
+        setCompletedMaterials((prev) => (prev.includes(String(quizMatId)) ? prev : [...prev, String(quizMatId)]));
+      }
+
+      if (res.data.completion_percentage !== undefined && selectedWeek) {
+        const newPercentage = Math.round(res.data.completion_percentage);
+        const isFinished = !!res.data.is_completed || newPercentage >= 100;
+
+        setSelectedWeek((prev) =>
+          prev
+            ? {
+                ...prev,
+                progress: newPercentage,
+                is_completed: isFinished,
+              }
+            : null
+        );
+
+        setContents((prevContents) =>
+          prevContents.map((w) => {
+            if (String(w.id) === String(selectedWeek.id)) {
+              return {
+                ...w,
+                progress: newPercentage,
+                is_completed: isFinished,
+              };
+            }
+            return w;
+          })
+        );
+      }
+
       if (res.data.next_round_activated) {
         alert(
           "Yanlış cevaplarınız olduğu için Yapay Zeka analizinden sonra 2. Tur başlayacaktır. Materyalleri tekrar gözden geçirebilirsiniz."
@@ -465,6 +500,8 @@ export default function StudentDashboard() {
       setIsAnalysisLoading(false);
     }
   };
+
+
 
   const handleSendChatMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -576,10 +613,23 @@ export default function StudentDashboard() {
 
   const handleCloseModalAndRefresh = async () => {
     setIsAnalysisModalOpen(false);
-    setQuizResult(null);
     setSelectedAnswers({});
     setCurrentAttemptId(null);
+
+    // Refresh contents and bootstrap to reload completed materials for active attempt_round
     await fetchContents(true);
+
+    if (selectedWeek) {
+      const quizMat = selectedWeek.materials?.find((m: Material) => m.content_type === 'form');
+      const qId = quizMat?.quiz?.id;
+      if (qId && String(qId) !== 'undefined' && String(qId) !== 'null') {
+        await fetchQuizLastAttempt(qId);
+      } else {
+        setQuizResult(null);
+      }
+    } else {
+      setQuizResult(null);
+    }
   };
 
   if (loading)

@@ -191,7 +191,7 @@ export const StudentAnalyticsTab: React.FC<StudentAnalyticsTabProps> = ({
             </div>
 
             <button 
-              disabled={analytics.length < 10 || loading}
+              disabled={(totalCount > 0 && currentPage * 3 >= totalCount) || analytics.length < 3 || loading}
               onClick={() => {
                 const nextPage = currentPage + 1;
                 setCurrentPage(nextPage);
