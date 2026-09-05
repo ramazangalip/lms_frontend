@@ -69,10 +69,6 @@ export default function AutoLogoutHandler({
       const token = localStorage.getItem('access_token');
       if (!token) return; // Giriş yapılmamışsa pas geç
 
-      // Eğer "Beni Hatırla" işaretlendiyse pasiflik uyarısını tetikleme (30 Gün Oturum Açık Kalsın)
-      const isRemembered = localStorage.getItem('remember_me') === 'true';
-      if (isRemembered) return;
-
       const now = Date.now();
       const elapsed = now - lastActivityRef.current;
 
