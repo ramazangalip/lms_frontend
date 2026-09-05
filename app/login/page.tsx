@@ -1,5 +1,5 @@
 "use client";
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import Link from 'next/link';
@@ -15,6 +15,7 @@ interface CustomTokenPayload {
   // department_name kaldırıldı
   email: string;
   user_id: number;
+  exp?: number;
 }
 
 export default function LoginPage() {
@@ -25,6 +26,46 @@ export default function LoginPage() {
   const [showInfoTooltip, setShowInfoTooltip] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const accessToken = localStorage.getItem('access_token');
+    const refreshToken = localStorage.getItem('refresh_token');
+
+    if (accessToken) {
+      try {
+        const decoded = jwtDecode<CustomTokenPayload>(accessToken);
+        if (decoded && decoded.exp && decoded.exp * 1000 > Date.now()) {
+          if (decoded.is_teacher) {
+            router.replace('/teacher-dashboard');
+          } else {
+            router.replace('/dashboard');
+          }
+          return;
+        }
+      } catch (e) {
+        console.error("Token geçersiz:", e);
+      }
+    }
+
+    if (refreshToken) {
+      api.post('/users/token/refresh/', { refresh: refreshToken })
+        .then(res => {
+          const newAccess = res.data.access;
+          localStorage.setItem('access_token', newAccess);
+          const decoded = jwtDecode<CustomTokenPayload>(newAccess);
+          if (decoded.is_teacher) {
+            router.replace('/teacher-dashboard');
+          } else {
+            router.replace('/dashboard');
+          }
+        })
+        .catch(() => {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('remember_me');
+        });
+    }
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -182,7 +223,7 @@ export default function LoginPage() {
                   onChange={e => setRememberMe(e.target.checked)} 
                   className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-primary cursor-pointer"
                 />
-                <span className="text-xs font-medium text-gray-700">Beni Hatırla <span className="text-gray-400 font-normal">(30 Gün Oturum Açık Kalsın)</span></span>
+                <span className="text-xs font-medium text-gray-700">Beni Hatırla </span>
               </label>
             </div>
           </div>
