@@ -99,44 +99,53 @@ export default function LoginPage() {
 
                   {showInfoTooltip && (
                     <div 
-                      className="absolute right-0 bottom-full mb-3 w-72 rounded-xl bg-gray-900/95 backdrop-blur-sm p-4 text-xs text-white shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 border border-gray-700/60"
+                      className="absolute right-[-2rem] sm:right-0 bottom-full mb-3 w-[calc(100vw-3.5rem)] max-w-[290px] sm:max-w-xs rounded-xl bg-gray-900/95 backdrop-blur-sm p-3.5 sm:p-4 text-xs text-white shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 border border-gray-700/60 font-normal"
                       onMouseEnter={() => setShowInfoTooltip(true)}
                       onMouseLeave={() => setShowInfoTooltip(false)}
                     >
-                      <div className="font-bold text-amber-400 mb-2 flex items-center gap-1.5 text-xs border-b border-gray-700/80 pb-1.5">
-                        <Info className="h-4 w-4 shrink-0 text-amber-400" /> Standart Şifre Formatı
+                      <div className="font-bold text-amber-400 mb-2 flex items-center justify-between gap-1.5 text-xs border-b border-gray-700/80 pb-1.5">
+                        <span className="flex items-center gap-1.5">
+                          <Info className="h-4 w-4 shrink-0 text-amber-400" /> Standart Şifre Formatı
+                        </span>
+                        <button 
+                          type="button" 
+                          onClick={(e) => { e.stopPropagation(); setShowInfoTooltip(false); }}
+                          className="sm:hidden text-gray-400 hover:text-white p-0.5 text-sm"
+                        >
+                          ✕
+                        </button>
                       </div>
                       
-                      <div className="space-y-2 text-[11px] leading-relaxed">
+                      <div className="space-y-2 text-[10.5px] sm:text-[11px] leading-relaxed">
                         <p className="text-gray-300 font-medium">
                           Sistem şifreniz aşağıdaki şablona göre oluşturulmuştur:
                         </p>
                         
                         {/* Şablon Kutu */}
-                        <div className="bg-gray-800/90 p-2 rounded-lg text-[10.5px] font-mono text-center text-emerald-400 border border-emerald-500/30 tracking-tight font-bold">
-                          [İsim İlk Harfi] + [Okul No Son 4 Hane] + ! + [Bölüm Kodu]
+                        <div className="bg-gray-800/90 p-2 rounded-lg text-[9.5px] sm:text-[10.5px] font-mono text-center text-emerald-400 border border-emerald-500/30 tracking-tight font-bold break-all">
+                          [İsim İlk Harf] + [No Son 4 Hane] + ! + [Bölüm Kodu]
                         </div>
 
                         {/* Örnek */}
-                        <div className="text-[10.5px] text-gray-300 bg-gray-800/50 p-2 rounded border border-gray-700/40 leading-normal">
+                        <div className="text-[10px] sm:text-[10.5px] text-gray-300 bg-gray-800/50 p-2 rounded border border-gray-700/40 leading-normal">
                           📌 <strong>Örnek:</strong> Mustafa (No: ...1016, Çocuk Gel.) <br/>
                           ➔ Şifre: <strong className="text-amber-300 font-mono font-bold text-xs">M1016!cg</strong>
                         </div>
 
                         {/* Bölüm Kodları Listesi */}
                         <div className="pt-1">
-                          <p className="font-bold text-gray-200 text-[10px] uppercase tracking-wider mb-1">Bölüm Kodları (Küçük Harf):</p>
-                          <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] text-gray-300 font-medium">
-                            <span>• Çocuk Gelişimi: <strong className="text-emerald-400 font-mono">cg</strong></span>
+                          <p className="font-bold text-gray-200 text-[9.5px] sm:text-[10px] uppercase tracking-wider mb-1">Bölüm Kodları (Küçük Harf):</p>
+                          <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[9.5px] sm:text-[10px] text-gray-300 font-medium">
+                            <span>• Çocuk Gel.: <strong className="text-emerald-400 font-mono">cg</strong></span>
                             <span>• Diyaliz: <strong className="text-emerald-400 font-mono">dy</strong></span>
-                            <span>• Diş Protez Tek.: <strong className="text-emerald-400 font-mono">dp</strong></span>
+                            <span>• Diş Protez: <strong className="text-emerald-400 font-mono">dp</strong></span>
                             <span>• Eczane Hiz.: <strong className="text-emerald-400 font-mono">eh</strong></span>
                             <span>• Fizyoterapi: <strong className="text-emerald-400 font-mono">fz</strong></span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="absolute right-3 -bottom-1.5 h-3 w-3 rotate-45 bg-gray-900 border-r border-b border-gray-700/60" />
+                      <div className="absolute right-5 sm:right-3 -bottom-1.5 h-3 w-3 rotate-45 bg-gray-900 border-r border-b border-gray-700/60" />
                     </div>
                   )}
                 </div>
