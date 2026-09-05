@@ -20,6 +20,7 @@ interface CustomTokenPayload {
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showInfoTooltip, setShowInfoTooltip] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -30,11 +31,16 @@ export default function LoginPage() {
     setLoading(true);
     
     try {
-      const res = await api.post('/users/login/', { email, password });
+      const res = await api.post('/users/login/', { email, password, remember_me: rememberMe });
       const { access, refresh } = res.data;
 
       localStorage.setItem('access_token', access);
       localStorage.setItem('refresh_token', refresh);
+      if (rememberMe) {
+        localStorage.setItem('remember_me', 'true');
+      } else {
+        localStorage.removeItem('remember_me');
+      }
 
       const decoded = jwtDecode<CustomTokenPayload>(access);
       
@@ -164,6 +170,20 @@ export default function LoginPage() {
                   )}
                 </button>
               </div>
+            </div>
+
+            {/* Beni Hatırla Seçeneği */}
+            <div className="flex items-center justify-between pt-1">
+              <label htmlFor="rememberMe" className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 cursor-pointer select-none">
+                <input 
+                  type="checkbox" 
+                  id="rememberMe"
+                  checked={rememberMe} 
+                  onChange={e => setRememberMe(e.target.checked)} 
+                  className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary accent-primary cursor-pointer"
+                />
+                <span className="text-xs font-medium text-gray-700">Beni Hatırla <span className="text-gray-400 font-normal">(30 Gün Oturum Açık Kalsın)</span></span>
+              </label>
             </div>
           </div>
 
