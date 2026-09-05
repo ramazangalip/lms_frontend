@@ -177,12 +177,12 @@ export default function LoginPage() {
         </form>
 
         <div className="text-center text-sm pt-4">
-          <p className="text-gray-600">
+          {/* <p className="text-gray-600">
             Hesabınız yok mu? <Link href="/register" className="font-bold text-primary hover:underline">Kayıt Ol</Link>
-          </p>
-          <p className="text-gray-600">
+          </p> */}
+          {/* <p className="text-gray-600">
             Şifrenizi mi Unuttunuz? <Link href="/forgot-password" className="font-bold text-primary hover:underline">Şifreyi Sıfırla</Link>
-          </p>
+          </p> */}
           <p className="text-gray-600">
             Yardım mı Almak İstiyorsunuz? <Link href="/guide" className="font-bold text-primary hover:underline">Site ve Mobil Uygulama Hakkında Yardım Almak için tıklayınız</Link>
           </p>
