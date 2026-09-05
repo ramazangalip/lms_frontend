@@ -1,6 +1,7 @@
 import { Metadata } from 'next';
 import { Roboto } from 'next/font/google';
 import './globals.css';
+import AutoLogoutHandler from '@/components/AutoLogoutHandler';
 
 const roboto = Roboto({ 
   subsets: ['latin'], 
@@ -28,6 +29,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="tr" className={`${roboto.variable}`}>
       <body className="antialiased font-roboto suppressHydrationWarning">
         {children}
+        <AutoLogoutHandler />
       </body>
     </html>
   );
