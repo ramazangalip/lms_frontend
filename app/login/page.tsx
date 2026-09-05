@@ -5,6 +5,7 @@ import api from '@/lib/api';
 import Link from 'next/link';
 import { jwtDecode } from 'jwt-decode';
 import { AxiosError } from 'axios';
+import { Eye, EyeOff, Info } from 'lucide-react';
 
 interface CustomTokenPayload {
   is_teacher: boolean;
@@ -19,6 +20,8 @@ interface CustomTokenPayload {
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showInfoTooltip, setShowInfoTooltip] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -72,13 +75,87 @@ export default function LoginPage() {
               className="w-full rounded-lg border border-gray-300 p-3 text-black bg-white focus:ring-2 focus:ring-primary outline-none"
               onChange={e => setEmail(e.target.value)} 
             />
-            <input 
-              type="password" 
-              placeholder="Şifre" 
-              required 
-              className="w-full rounded-lg border border-gray-300 p-3 text-black bg-white focus:ring-2 focus:ring-primary outline-none"
-              onChange={e => setPassword(e.target.value)} 
-            />
+            <div className="relative">
+              <input 
+                type={showPassword ? "text" : "password"} 
+                placeholder="Şifre" 
+                required 
+                className="w-full rounded-lg border border-gray-300 p-3 pr-20 text-black bg-white focus:ring-2 focus:ring-primary outline-none"
+                onChange={e => setPassword(e.target.value)} 
+              />
+              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center space-x-1.5">
+                {/* Şifre Formatı Bilgilendirme İkonu & Popover Tooltip */}
+                <div className="relative flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowInfoTooltip(!showInfoTooltip)}
+                    onMouseEnter={() => setShowInfoTooltip(true)}
+                    onMouseLeave={() => setShowInfoTooltip(false)}
+                    className="p-1 text-gray-400 hover:text-primary transition-colors focus:outline-none cursor-pointer"
+                    aria-label="Şifre formatı bilgisi"
+                  >
+                    <Info className="h-5 w-5" />
+                  </button>
+
+                  {showInfoTooltip && (
+                    <div 
+                      className="absolute right-0 bottom-full mb-3 w-72 rounded-xl bg-gray-900/95 backdrop-blur-sm p-4 text-xs text-white shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150 border border-gray-700/60"
+                      onMouseEnter={() => setShowInfoTooltip(true)}
+                      onMouseLeave={() => setShowInfoTooltip(false)}
+                    >
+                      <div className="font-bold text-amber-400 mb-2 flex items-center gap-1.5 text-xs border-b border-gray-700/80 pb-1.5">
+                        <Info className="h-4 w-4 shrink-0 text-amber-400" /> Standart Şifre Formatı
+                      </div>
+                      
+                      <div className="space-y-2 text-[11px] leading-relaxed">
+                        <p className="text-gray-300 font-medium">
+                          Sistem şifreniz aşağıdaki şablona göre oluşturulmuştur:
+                        </p>
+                        
+                        {/* Şablon Kutu */}
+                        <div className="bg-gray-800/90 p-2 rounded-lg text-[10.5px] font-mono text-center text-emerald-400 border border-emerald-500/30 tracking-tight font-bold">
+                          [İsim İlk Harfi] + [Okul No Son 4 Hane] + ! + [Bölüm Kodu]
+                        </div>
+
+                        {/* Örnek */}
+                        <div className="text-[10.5px] text-gray-300 bg-gray-800/50 p-2 rounded border border-gray-700/40 leading-normal">
+                          📌 <strong>Örnek:</strong> Mustafa (No: ...1016, Çocuk Gel.) <br/>
+                          ➔ Şifre: <strong className="text-amber-300 font-mono font-bold text-xs">M1016!cg</strong>
+                        </div>
+
+                        {/* Bölüm Kodları Listesi */}
+                        <div className="pt-1">
+                          <p className="font-bold text-gray-200 text-[10px] uppercase tracking-wider mb-1">Bölüm Kodları (Küçük Harf):</p>
+                          <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px] text-gray-300 font-medium">
+                            <span>• Çocuk Gelişimi: <strong className="text-emerald-400 font-mono">cg</strong></span>
+                            <span>• Diyaliz: <strong className="text-emerald-400 font-mono">dy</strong></span>
+                            <span>• Diş Protez Tek.: <strong className="text-emerald-400 font-mono">dp</strong></span>
+                            <span>• Eczane Hiz.: <strong className="text-emerald-400 font-mono">eh</strong></span>
+                            <span>• Fizyoterapi: <strong className="text-emerald-400 font-mono">fz</strong></span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="absolute right-3 -bottom-1.5 h-3 w-3 rotate-45 bg-gray-900 border-r border-b border-gray-700/60" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Şifre Göster/Gizle Göz İkonu */}
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="p-1 text-gray-500 hover:text-gray-700 transition-colors focus:outline-none cursor-pointer"
+                  aria-label={showPassword ? "Şifreyi gizle" : "Şifreyi göster"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
 
           <button 
