@@ -3,6 +3,7 @@ import { Roboto } from 'next/font/google';
 import './globals.css';
 import AutoLogoutHandler from '@/components/AutoLogoutHandler';
 import PwaRegister from '@/components/PwaRegister';
+import InstallBanner from '@/components/InstallBanner';
 
 const roboto = Roboto({ 
   subsets: ['latin'], 
@@ -51,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <AutoLogoutHandler />
         <PwaRegister />
+        <InstallBanner />
       </body>
     </html>
   );
