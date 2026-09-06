@@ -43,12 +43,12 @@ export default function InstallBanner() {
     <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded-2xl bg-gray-900 p-4 text-white shadow-2xl border border-gray-700 flex items-center justify-between gap-3 animate-fade-in">
       <div className="flex items-center gap-3">
         <img
-          src="/icons/icon-192x192.png"
+          src="/icon-192x192.png"
           alt="App Icon"
           className="w-12 h-12 rounded-xl object-cover bg-white"
         />
         <div>
-          <h4 className="text-sm font-semibold">AI EDU LMS</h4>
+          <h4 className="text-sm font-semibold">BÜ LMS</h4>
           <p className="text-xs text-gray-400">Hızlı erişim için uygulamayı kur</p>
         </div>
       </div>
