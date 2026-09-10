@@ -503,6 +503,36 @@ export default function StudentDashboard() {
 
 
 
+  const fetchChatHistory = async () => {
+    try {
+      const res = await api.get('/contents/ai-chat/history/', {
+        params: { weekly_content_id: selectedWeek?.id }
+      });
+      const loadedMsgs: ChatMessage[] = [
+        { role: 'bot', content: selectedWeek ? `Merhaba! Ben BÜ-LMS Yapay Zeka asistanıyım. ${selectedWeek.week_number}. Hafta konusundaki sorularınızı sorabilirsiniz.` : 'Merhaba! Ben BÜ-LMS Yapay Zeka asistanıyım. Sana nasıl yardımcı olabilirim?' }
+      ];
+      if (res.data && Array.isArray(res.data.history) && res.data.history.length > 0) {
+        res.data.history.forEach((item: any) => {
+          if (item.question_text) {
+            loadedMsgs.push({ role: 'user', content: item.question_text });
+          }
+          if (item.ai_response_text) {
+            loadedMsgs.push({ role: 'bot', content: item.ai_response_text });
+          }
+        });
+      }
+      setMessages(loadedMsgs);
+    } catch (err) {
+      console.error("Sohbet geçmişi yüklenemedi:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (isChatOpen) {
+      fetchChatHistory();
+    }
+  }, [isChatOpen, selectedWeek?.id]);
+
   const handleSendChatMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
