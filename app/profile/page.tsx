@@ -16,7 +16,8 @@ import {
   Sparkles,
   CheckCircle2,
   ShieldCheck,
-  BarChart3
+  BarChart3,
+  X
 } from 'lucide-react';
 import api from '@/lib/api';
 import Link from 'next/link';
@@ -50,6 +51,7 @@ interface WeeklyContent {
 
 export default function ProfilePage() {
   const [badges, setBadges] = useState<Badge[]>([]);
+  const [selectedBadge, setSelectedBadge] = useState<Badge | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
   const [contents, setContents] = useState<WeeklyContent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -369,10 +371,11 @@ export default function ProfilePage() {
               return (
                 <div
                   key={badge.id}
-                  className={`relative group p-5 rounded-3xl border-2 transition-all duration-300 flex flex-col justify-between min-h-[190px] ${
+                  onClick={() => setSelectedBadge(badge)}
+                  className={`relative group p-5 rounded-3xl border-2 transition-all duration-300 flex flex-col justify-between min-h-[190px] cursor-pointer hover:scale-[1.03] active:scale-95 ${
                     badge.is_earned
-                      ? 'bg-white border-red-600 shadow-xl shadow-red-600/5 scale-[1.02]'
-                      : 'bg-gray-50/80 border-gray-100 opacity-60 grayscale hover:opacity-80'
+                      ? 'bg-white border-red-600 shadow-xl shadow-red-600/5'
+                      : 'bg-gray-50/80 border-gray-100 opacity-60 grayscale hover:opacity-100 hover:grayscale-0'
                   }`}
                 >
                   <div>
@@ -410,7 +413,7 @@ export default function ProfilePage() {
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[8px] font-black uppercase tracking-widest text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
-                        <Lock size={10} /> Kilitli
+                        <Lock size={10} /> Kilitli (Detay İçin Tıkla)
                       </span>
                     )}
                   </div>
@@ -428,6 +431,103 @@ export default function ProfilePage() {
         </div>
 
       </div>
+
+      {/* ROZET İÇERİK DETAY MODALI */}
+      {selectedBadge && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setSelectedBadge(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-md w-full p-6 md:p-8 space-y-6 shadow-2xl border-2 border-gray-100 relative animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Kapat Butonu */}
+            <button
+              onClick={() => setSelectedBadge(null)}
+              className="absolute top-5 right-5 p-2 text-gray-400 hover:text-black hover:bg-gray-100 rounded-full transition-all"
+            >
+              <X size={20} />
+            </button>
+
+            {/* Modal Üst Başlık & İkon */}
+            <div className="text-center space-y-4 pt-2">
+              {(() => {
+                const iconKey = selectedBadge.icon_name as keyof typeof Icons;
+                const IconComp = (Icons[iconKey] as React.ElementType) || Award;
+                return (
+                  <div
+                    className={`w-20 h-20 mx-auto rounded-3xl flex items-center justify-center shadow-inner ${
+                      selectedBadge.is_earned
+                        ? 'bg-red-50 text-red-600 border-2 border-red-100 shadow-red-500/10'
+                        : 'bg-gray-100 text-gray-400 border-2 border-gray-200'
+                    }`}
+                  >
+                    <IconComp size={40} strokeWidth={2.5} />
+                  </div>
+                );
+              })()}
+
+              <div>
+                <h3 className="text-xl font-black text-black uppercase tracking-tight">
+                  {selectedBadge.name}
+                </h3>
+                <div className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest">
+                  {selectedBadge.is_earned ? (
+                    <span className="bg-green-50 text-green-700 border border-green-200 px-3.5 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
+                      <CheckCircle2 size={13} className="text-green-600" /> Kazanıldı
+                      {selectedBadge.earned_at && (
+                        <span className="text-gray-400 font-bold ml-1">
+                          ({new Date(selectedBadge.earned_at).toLocaleDateString('tr-TR')})
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="bg-gray-100 text-gray-500 border border-gray-200 px-3.5 py-1.5 rounded-full flex items-center gap-1.5">
+                      <Lock size={13} /> Henüz Kazanılmadı
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Detay Bilgileri */}
+            <div className="space-y-4 pt-2 border-t border-gray-100 text-left">
+              {/* Açıklama */}
+              {selectedBadge.description && (
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-1">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                    Rozet Açıklaması
+                  </p>
+                  <p className="text-xs font-bold text-gray-800 leading-relaxed">
+                    {selectedBadge.description}
+                  </p>
+                </div>
+              )}
+
+              {/* Kazanma Şartı */}
+              {selectedBadge.requirement_text && (
+                <div className="bg-red-50/50 p-4 rounded-2xl border border-red-100/80 space-y-1">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-red-600 flex items-center gap-1">
+                    <Target size={12} /> Kazanma Şartı
+                  </p>
+                  <p className="text-xs font-bold text-gray-900 leading-relaxed">
+                    {selectedBadge.requirement_text}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Kapat Butonu */}
+            <button
+              onClick={() => setSelectedBadge(null)}
+              className="w-full bg-black hover:bg-gray-800 text-white font-black text-xs uppercase tracking-widest py-3.5 rounded-2xl transition-all shadow-lg active:scale-95"
+            >
+              KAPAT
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

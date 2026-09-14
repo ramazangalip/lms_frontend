@@ -56,8 +56,10 @@ export interface WeeklyContent {
   release_date?: string;
   due_date?: string;
   is_locked: boolean;
-  total_score?: number;
   lock_reason?: string;
+  is_temporarily_unlocked?: boolean;
+  temporary_unlock_until?: string;
+  total_score?: number;
   is_intro_watched: boolean;
   materials: Material[];
   flashcards: FlashcardData[];

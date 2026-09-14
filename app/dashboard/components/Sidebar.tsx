@@ -103,10 +103,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           // Kilit mesajını belirle
           let lockReason = "";
-          if (introLocked) {
+          if (introLocked && preTestLocked) {
+            lockReason = "Önce tanıtım videosunu izlemeli ve ön testi tamamlamalısınız.";
+          } else if (introLocked) {
             lockReason = "Önce tanıtım videosunu izlemelisiniz.";
           } else if (preTestLocked) {
-            lockReason = "Önce ön değerlendirme testini bitirmelisiniz.";
+            lockReason = "Önce ön değerlendirme testini tamamlamalısınız.";
           } else if (isBackendLocked) {
             lockReason = weekData?.lock_reason || "Bu içerik şu an erişime kapalıdır.";
           }
@@ -136,12 +138,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   )}
                   <div className="text-left leading-tight">
                     <p className="text-xs font-semibold">Hafta {num}</p>
-                    {weekData && !isWeekLocked && (
+                    {weekData?.is_temporarily_unlocked ? (
+                      <p className="text-[7px] bg-amber-500/20 text-amber-400 font-bold uppercase mt-0.5 px-1 rounded inline-block">⚡ 2 GÜN AÇIK</p>
+                    ) : weekData && !isWeekLocked ? (
                       <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mt-0.5">
                         %{weekData.progress || 0} TAMAMLANDI
                       </p>
-                    )}
-                    {isWeekLocked && weekData && (
+                    ) : null}
+                    {isWeekLocked && weekData && !weekData?.is_temporarily_unlocked && (
                       <p className="text-[7px] text-red-500 font-bold uppercase mt-0.5">KİLİTLİ</p>
                     )}
                   </div>

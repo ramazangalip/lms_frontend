@@ -193,14 +193,15 @@ export default function StudentDashboard() {
           ...week,
           progress: Math.round(week.progress || 0),
           is_completed: !!week.is_completed,
-          is_survey_required: week.is_survey_required,
+          is_entry_test_required: !!week.is_entry_test_required,
+          is_survey_required: !!week.is_survey_required,
           survey_data: week.survey_data
         };
       });
       setContents(mergedData);
 
       if (selectedWeek) {
-        const freshWeekData = mergedData.find((w: WeeklyContent) => w.id === selectedWeek.id);
+        const freshWeekData = mergedData.find((w: WeeklyContent) => String(w.id) === String(selectedWeek.id));
         if (freshWeekData) {
           setSelectedWeek(freshWeekData);
         }
