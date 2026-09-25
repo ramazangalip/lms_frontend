@@ -170,24 +170,22 @@ export default function LoginPage() {
                         
                         {/* Şablon Kutu */}
                         <div className="bg-gray-800/90 p-2 rounded-lg text-[9.5px] sm:text-[10.5px] font-mono text-center text-emerald-400 border border-emerald-500/30 tracking-tight font-bold break-all">
-                          [İsim İlk Harf] + [No Son 4 Hane] + ! + [Bölüm Kodu]
+                          [İsim İlk Harf] + [Oğrenci No Son 4 Hane] + ! + [Bölüm Kodu]
                         </div>
 
                         {/* Örnek */}
                         <div className="text-[10px] sm:text-[10.5px] text-gray-300 bg-gray-800/50 p-2 rounded border border-gray-700/40 leading-normal">
-                          📌 <strong>Örnek:</strong> Mustafa (No: ...1016, Çocuk Gel.) <br/>
-                          ➔ Şifre: <strong className="text-amber-300 font-mono font-bold text-xs">M1016!cg</strong>
+                          📌 <strong>Örnek:</strong> Mustafa (No: ...1016, Matematik.) <br/>
+                          ➔ Şifre: <strong className="text-amber-300 font-mono font-bold text-xs">M1016!mt</strong>
                         </div>
 
                         {/* Bölüm Kodları Listesi */}
                         <div className="pt-1">
                           <p className="font-bold text-gray-200 text-[9.5px] sm:text-[10px] uppercase tracking-wider mb-1">Bölüm Kodları (Küçük Harf):</p>
                           <div className="grid grid-cols-2 gap-x-2 gap-y-1 text-[9.5px] sm:text-[10px] text-gray-300 font-medium">
-                            <span>• Çocuk Gel.: <strong className="text-emerald-400 font-mono">cg</strong></span>
-                            <span>• Diyaliz: <strong className="text-emerald-400 font-mono">dy</strong></span>
-                            <span>• Diş Protez: <strong className="text-emerald-400 font-mono">dp</strong></span>
-                            <span>• Eczane Hiz.: <strong className="text-emerald-400 font-mono">eh</strong></span>
-                            <span>• Fizyoterapi: <strong className="text-emerald-400 font-mono">fz</strong></span>
+                            <span>• Türk Dili Ve Edebiyatı: <strong className="text-emerald-400 font-mono">td</strong></span>
+                            <span>• Siyaset Bilimi ve Kamu Yönetimi: <strong className="text-emerald-400 font-mono">sb</strong></span>
+                            <span>• Matematik: <strong className="text-emerald-400 font-mono">mt</strong></span>
                           </div>
                         </div>
                       </div>
