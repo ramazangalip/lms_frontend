@@ -1,5 +1,5 @@
 "use client";
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Bot, X, Sparkles } from 'lucide-react';
 
 interface AIAnalysisModalProps {
@@ -17,11 +17,34 @@ export const AIAnalysisModal: React.FC<AIAnalysisModalProps> = ({
   setIsAnalysisModalOpen,
   handleCloseModalAndRefresh,
 }) => {
+  // ESC tuşu basıldığında da ikinci tura geçişi ve kapatmayı tetikle
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleCloseModalAndRefresh();
+      }
+    };
+
+    if (isAnalysisModalOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isAnalysisModalOpen, handleCloseModalAndRefresh]);
+
   if (!isAnalysisModalOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-secondary/90 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto leading-none text-left">
-      <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.5)] overflow-hidden border-4 border-white my-auto flex flex-col max-h-[90vh] leading-none text-left">
+    <div 
+      className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-secondary/90 backdrop-blur-md animate-in fade-in duration-300 overflow-y-auto leading-none text-left cursor-pointer"
+      onClick={handleCloseModalAndRefresh}
+    >
+      <div 
+        className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-[0_40px_100px_rgba(0,0,0,0.5)] overflow-hidden border-4 border-white my-auto flex flex-col max-h-[90vh] leading-none text-left cursor-default"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* MODAL BAŞLIK ALANI */}
         <div className="bg-secondary p-8 flex items-center justify-between text-white border-b-4 border-primary leading-none text-left">
           <div className="flex items-center gap-5 leading-none text-left">
@@ -37,9 +60,12 @@ export const AIAnalysisModal: React.FC<AIAnalysisModalProps> = ({
               </p>
             </div>
           </div>
+          {/* SAĞ ÜSTTEKİ ÇARPI İKONU: İkinci tura geçişi ve yenilemeyi çalıştırır */}
           <button
+            type="button"
             onClick={handleCloseModalAndRefresh}
-            className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-primary transition-all leading-none text-center"
+            className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-primary transition-all leading-none text-center cursor-pointer"
+            aria-label="Kapat ve 2. Tura Geç"
           >
             <X size={24} className="text-left" />
           </button>
@@ -72,8 +98,9 @@ export const AIAnalysisModal: React.FC<AIAnalysisModalProps> = ({
         {/* MODAL ALT BUTON ALANI */}
         <div className="p-8 bg-white border-t flex justify-center leading-none text-left">
           <button
+            type="button"
             onClick={handleCloseModalAndRefresh}
-            className="w-full md:w-auto bg-secondary text-white px-16 py-5 rounded-[2rem] font-black text-xs uppercase shadow-xl active:scale-95 leading-none text-left transition-transform hover:scale-[1.02]"
+            className="w-full md:w-auto bg-secondary text-white px-16 py-5 rounded-[2rem] font-black text-xs uppercase shadow-xl active:scale-95 leading-none text-left transition-transform hover:scale-[1.02] cursor-pointer"
           >
             Anladım, Devam Et
           </button>

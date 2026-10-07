@@ -5,7 +5,8 @@ import api from '@/lib/api';
 import Link from 'next/link';
 import { jwtDecode } from 'jwt-decode';
 import { AxiosError } from 'axios';
-import { Eye, EyeOff, Info } from 'lucide-react';
+import { Eye, EyeOff, Info, PlayCircle } from 'lucide-react';
+import { IntroVideoModal } from './components/IntroVideoModal';
 
 interface CustomTokenPayload {
   is_teacher: boolean;
@@ -25,6 +26,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showInfoTooltip, setShowInfoTooltip] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isIntroModalOpen, setIsIntroModalOpen] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
@@ -235,18 +237,27 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="text-center text-sm pt-4">
-          {/* <p className="text-gray-600">
-            Hesabınız yok mu? <Link href="/register" className="font-bold text-primary hover:underline">Kayıt Ol</Link>
-          </p> */}
-          {/* <p className="text-gray-600">
-            Şifrenizi mi Unuttunuz? <Link href="/forgot-password" className="font-bold text-primary hover:underline">Şifreyi Sıfırla</Link>
-          </p> */}
-          <p className="text-gray-600">
+        <div className="text-center text-sm pt-4 space-y-2">
+          <div>
+            <button
+              type="button"
+              onClick={() => setIsIntroModalOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-primary hover:underline transition-all cursor-pointer"
+            >
+              <PlayCircle size={15} /> Tanıtım Videosunu Tekrar İzle
+            </button>
+          </div>
+          <p className="text-gray-600 text-xs">
             Yardım mı Almak İstiyorsunuz? <Link href="/guide" className="font-bold text-primary hover:underline">Site ve Mobil Uygulama Hakkında Yardım Almak için tıklayınız</Link>
           </p>
         </div>
       </div>
+
+      {/* Giriş Ekranı Tanıtım Videosu Modalı */}
+      <IntroVideoModal 
+        isOpen={isIntroModalOpen} 
+        onClose={() => setIsIntroModalOpen(false)} 
+      />
     </div>
   );
 }

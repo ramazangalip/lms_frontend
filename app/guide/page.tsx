@@ -8,8 +8,8 @@ export default function GuidePage() {
   const [activeTab, setActiveTab] = useState<'guide' | 'extra' | 'mobile'>('guide');
 
   // URL Tanımlamaları
-  const guideVideoUrl = "https://www.youtube.com/embed/ulFHl4c0QpE"; // 1. Video
-  const extraVideoUrl = "https://www.youtube.com/embed/SLgnIETCQ-s?si=tP3VzuCWgaHtvnTZ"; // 2. Video (Burayı değiştirirsin)
+  const guideVideoUrl = "https://www.youtube.com/embed/yeYMTkqG-ZE?si=yHJFj_ycQzpO34rw"; // 1. Video
+  const extraVideoUrl = "https://www.youtube.com/embed/5rCHzM0U4ds"; // 2. Video (Burayı değiştirirsin)
   const apkDownloadUrl = "https://drive.google.com/uc?export=download&id=1ezJVz7CgRQbxn5zyWZ6Lp9Sh8Ej9yoDz";
 
   return (
@@ -59,12 +59,7 @@ export default function GuidePage() {
           >
             <PlayCircle size={16} /> MOBİL UYGULAMA İNDİRME REHBERİ
           </button>
-          <button 
-            onClick={() => setActiveTab('mobile')}
-            className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl text-[10px] font-black tracking-widest transition-all ${activeTab === 'mobile' ? 'bg-white shadow-md text-[#ce1212]' : 'text-gray-400 hover:bg-gray-200'}`}
-          >
-            <Smartphone size={16} /> MOBİL UYGULAMA DOSYASI
-          </button>
+          
         </div>
 
         {/* İÇERİK ALANI */}

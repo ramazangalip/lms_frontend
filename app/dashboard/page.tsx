@@ -651,12 +651,20 @@ export default function StudentDashboard() {
     await fetchContents(true);
 
     if (selectedWeek) {
-      const quizMat = selectedWeek.materials?.find((m: Material) => m.content_type === 'form');
-      const qId = quizMat?.quiz?.id;
-      if (qId && String(qId) !== 'undefined' && String(qId) !== 'null') {
-        await fetchQuizLastAttempt(qId);
-      } else {
-        setQuizResult(null);
+      const freshWeekData = contents.find((w: WeeklyContent) => String(w.id) === String(selectedWeek.id)) || selectedWeek;
+      if (freshWeekData) {
+        setSelectedWeek(freshWeekData);
+        // İkinci tura geçildiğinde öğrenciyi haftanın ilk materyaline yönlendir
+        if (freshWeekData.materials && freshWeekData.materials.length > 0) {
+          setActiveMaterial(getSortedMaterials(freshWeekData.materials)[0]);
+        }
+        const quizMat = freshWeekData.materials?.find((m: Material) => m.content_type === 'form');
+        const qId = quizMat?.quiz?.id;
+        if (qId && String(qId) !== 'undefined' && String(qId) !== 'null') {
+          await fetchQuizLastAttempt(qId);
+        } else {
+          setQuizResult(null);
+        }
       }
     } else {
       setQuizResult(null);
@@ -689,6 +697,7 @@ export default function StudentDashboard() {
         isSidebarOpen={isSidebarOpen}
         introStatus={introStatus}
         preTestResult={preTestResult}
+        preTestQuestions={preTestQuestions}
         setIsSidebarOpen={setIsSidebarOpen}
         setIsIntroView={setIsIntroView}
         setActiveMaterial={setActiveMaterial}
@@ -700,7 +709,7 @@ export default function StudentDashboard() {
         {selectedWeek ? (
           <div className="animate-in fade-in duration-500">
             {/* 1. KADEME: SİSTEME İLK GİRİŞ (TANITIM VEYA GENEL ÖN TEST EKSİKSE) */}
-            {isIntroView || !introStatus.isWatched || !preTestResult?.is_completed ? (
+            {isIntroView || !introStatus.isWatched || (!preTestResult?.is_completed && preTestQuestions.length > 0) ? (
               <PreTestGatekeeper
                 introStatus={introStatus}
                 preTestResult={preTestResult}

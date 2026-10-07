@@ -9,7 +9,7 @@ import {
   LogOut,
   X
 } from 'lucide-react';
-import { WeeklyContent, Material } from '../types';
+import { WeeklyContent, Material, Question } from '../types';
 
 interface SidebarProps {
   contents: WeeklyContent[];
@@ -18,6 +18,7 @@ interface SidebarProps {
   isSidebarOpen: boolean;
   introStatus: { url: string; title: string; isWatched: boolean; description: string };
   preTestResult: { score: number; correct?: number; wrong?: number; is_completed: boolean } | null;
+  preTestQuestions?: Question[];
   setIsSidebarOpen: (open: boolean) => void;
   setIsIntroView: (intro: boolean) => void;
   setActiveMaterial: (material: Material | null) => void;
@@ -32,6 +33,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isSidebarOpen,
   introStatus,
   preTestResult,
+  preTestQuestions = [],
   setIsSidebarOpen,
   setIsIntroView,
   setActiveMaterial,
@@ -93,7 +95,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           // Temel kilitler (Intro ve Pre-test)
           const introLocked = !introStatus.isWatched;
-          const preTestLocked = !preTestResult?.is_completed;
+          const isPreTestActive = preTestQuestions.length > 0;
+          const preTestLocked = isPreTestActive && !preTestResult?.is_completed;
 
           // Backend'den gelen dinamik kilit (Tarih ve Sıralı İlerleme)
           const isBackendLocked = weekData?.is_locked === true;

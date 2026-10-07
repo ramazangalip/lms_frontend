@@ -31,14 +31,15 @@ export const PreTestGatekeeper: React.FC<PreTestGatekeeperProps> = ({
   handlePreTestSubmit,
 }) => {
   const isVideoWatched = introStatus.isWatched;
-  const isPreTestCompleted = Boolean(preTestResult?.is_completed);
+  const isPreTestActive = preTestQuestions.length > 0;
+  const isPreTestCompleted = Boolean(preTestResult?.is_completed) || !isPreTestActive;
 
   let badgeText = "";
   let iconColorClass = "text-primary";
   let badgeContainerClass = "bg-red-50 border-red-200 text-red-900";
 
   if (isVideoWatched && isPreTestCompleted) {
-    badgeText = "TANITIM VİDEOSU VE ÖN TEST TAMAMLANDI";
+    badgeText = isPreTestActive ? "TANITIM VİDEOSU VE ÖN TEST TAMAMLANDI" : "TANITIM VİDEOSU İZLENDİ";
     iconColorClass = "text-green-500";
     badgeContainerClass = "bg-green-50 border-green-200 text-green-800";
   } else if (isVideoWatched && !isPreTestCompleted) {
@@ -46,11 +47,13 @@ export const PreTestGatekeeper: React.FC<PreTestGatekeeperProps> = ({
     iconColorClass = "text-amber-500";
     badgeContainerClass = "bg-amber-50 border-amber-200 text-amber-900";
   } else if (!isVideoWatched && isPreTestCompleted) {
-    badgeText = "ÖN TEST TAMAMLANDI. SİSTEME GİRİŞ İÇİN TANITIM VİDEOSUNU İZLEMELİSİNİZ";
+    badgeText = isPreTestActive ? "ÖN TEST TAMAMLANDI. SİSTEME GİRİŞ İÇİN TANITIM VİDEOSUNU İZLEMELİSİNİZ" : "SİSTEME GİRİŞ İÇİN TANITIM VİDEOSUNU İZLEMELİSİNİZ";
     iconColorClass = "text-amber-500";
     badgeContainerClass = "bg-amber-50 border-amber-200 text-amber-900";
   } else {
-    badgeText = "SİSTEME GİRİŞ İÇİN TANITIM VİDEOSUNU İZLEMELİ VE ÖN TESTİ TAMAMLAMALISINIZ";
+    badgeText = isPreTestActive
+      ? "SİSTEME GİRİŞ İÇİN TANITIM VİDEOSUNU İZLEMELİ VE ÖN TESTİ TAMAMLAMALISINIZ"
+      : "SİSTEME GİRİŞ İÇİN TANITIM VİDEOSUNU İZLEMELİSİNİZ";
     iconColorClass = "text-primary";
     badgeContainerClass = "bg-red-50 border-red-200 text-red-900";
   }
@@ -134,6 +137,20 @@ export const PreTestGatekeeper: React.FC<PreTestGatekeeperProps> = ({
                 <Sparkles size={16} className="text-primary" />
                 EĞİTİM İÇERİKLERİ ERİŞİME AÇILDI!
               </div>
+            </div>
+          </div>
+        ) : !isPreTestActive ? (
+          <div className="bg-gradient-to-br from-blue-50/50 to-white p-10 rounded-[3rem] border-2 border-blue-100 shadow-xl text-center space-y-6 animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-blue-500 text-white rounded-full flex items-center justify-center mx-auto shadow-lg shadow-blue-200">
+              <CheckCircle2 size={32} />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-black text-secondary uppercase tracking-tight">
+                Ön Değerlendirme Testi Bulunmamaktadır
+              </h3>
+              <p className="text-xs text-gray-500 font-bold uppercase tracking-widest max-w-md mx-auto">
+                Şu anda aktif bir ön değerlendirme testi tanımlanmamıştır. Tanıtım videosunu izleyerek doğrudan haftalık ders içeriklerine erişebilirsiniz.
+              </p>
             </div>
           </div>
         ) : (
