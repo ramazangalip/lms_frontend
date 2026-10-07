@@ -7,7 +7,7 @@ import {
   ChevronLeft,
   ChevronRight
 } from 'lucide-react';
-import { SurveyAnalysisResult, departmentList } from '../types';
+import { SurveyAnalysisResult, departmentList, getDeptName } from '../types';
 
 interface SurveyResultsTabProps {
   selectedDepartment: string;
@@ -130,7 +130,7 @@ export const SurveyResultsTab: React.FC<SurveyResultsTabProps> = ({
       .map((item, idx) => ({
         rank: idx + 1,
         student: item.studentName,
-        department: selectedDepartment ? String(selectedDepartment).toUpperCase() : "ÇOCUK GELİŞİMİ",
+        department: selectedDepartment ? getDeptName(selectedDepartment).toUpperCase() : "SİYASET BİLİMİ VE KAMU YÖNETİMİ",
         total_time: `${(item.item_count * 1.2).toFixed(1)} Saat`
       }));
 

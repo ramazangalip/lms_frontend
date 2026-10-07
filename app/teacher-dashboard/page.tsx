@@ -40,14 +40,14 @@ export default function TeacherDashboard() {
   const [analytics, setAnalytics] = useState<StudentAnalytics[]>([]);
   const [bulkData, setBulkData] = useState<BulkStudentData[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<StudentAnalytics | null>(null);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('cocukgelisimi');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('siyasetbilimi');
 
   const [weekNumber, setWeekNumber] = useState(1);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [releaseDate, setReleaseDate] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [scheduleDept, setScheduleDept] = useState<string>('cocukgelisimi');
+  const [scheduleDept, setScheduleDept] = useState<string>('siyasetbilimi');
   const [weekSchedules, setWeekSchedules] = useState<Record<string, { release_date: string | null; due_date: string | null }>>({});
 
   const [introTitle, setIntroTitle] = useState('Genel Tanıtım ve Oryantasyon');
@@ -241,7 +241,7 @@ export default function TeacherDashboard() {
       const rawSchedules = data.schedules || {};
       setWeekSchedules(rawSchedules);
 
-      const activeDeptKey = scheduleDept || 'cocukgelisimi';
+      const activeDeptKey = scheduleDept || 'siyasetbilimi';
       const currentDeptSchedule = rawSchedules[activeDeptKey];
 
       if (currentDeptSchedule && currentDeptSchedule.release_date) {

@@ -185,15 +185,24 @@ export interface SurveyAnalysisResult {
 // --- BÖLÜM LİSTESİ VE YARDIMCI FONKSİYONLAR ---
 
 export const departmentList = [
-  { id: 'cocukgelisimi', name: 'Çocuk Gelişimi' },
-  { id: 'diyaliz', name: 'Diyaliz' },
-  { id: 'disprotezteknolojisi', name: 'Diş Protez Teknolojisi' },
-  { id: 'eczanehizmetleri', name: 'Eczane Hizmetleri' },
-  { id: 'fizyoterapi', name: 'Fizyoterapi' },
+  { id: 'siyasetbilimi', name: 'Siyaset Bilimi ve Kamu Yönetimi' },
+  { id: 'turkdili', name: 'Türk Dili ve Edebiyatı' },
+  { id: 'matematik', name: 'Matematik' },
 ];
 
 export const getDeptName = (id: string) => {
-  const dept = departmentList.find(d => d.id === id);
+  if (!id) return id;
+  const lowerId = String(id).toLowerCase();
+  const deptMap: Record<string, string> = {
+    'siyasetbilimi': 'Siyaset Bilimi ve Kamu Yönetimi',
+    'sb': 'Siyaset Bilimi ve Kamu Yönetimi',
+    'turkdili': 'Türk Dili ve Edebiyatı',
+    'td': 'Türk Dili ve Edebiyatı',
+    'matematik': 'Matematik',
+    'mt': 'Matematik',
+  };
+  if (deptMap[lowerId]) return deptMap[lowerId];
+  const dept = departmentList.find(d => d.id === lowerId);
   return dept ? dept.name : id;
 };
 

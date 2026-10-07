@@ -23,11 +23,9 @@ export default function RegisterPage() {
 
 
   const departments = [
-    { id: 'cocukgelisimi', name: 'Çocuk Gelişimi' },
-    { id: 'diyaliz', name: 'Diyaliz' },
-    { id: 'disprotezteknolojisi', name: 'Diş Protez Teknolojisi' },
-    { id: 'eczanehizmetleri', name: 'Eczane Hizmetleri' },
-    { id: 'fizyoterapi', name: 'Fizyoterapi' },
+    { id: 'siyasetbilimi', name: 'Siyaset Bilimi ve Kamu Yönetimi' },
+    { id: 'turkdili', name: 'Türk Dili ve Edebiyatı' },
+    { id: 'matematik', name: 'Matematik' },
   ];
 
   const handleSendOTP = async () => {

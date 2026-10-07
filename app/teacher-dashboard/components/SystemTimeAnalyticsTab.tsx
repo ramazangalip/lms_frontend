@@ -4,7 +4,7 @@ import {
   Filter,
   FileText
 } from 'lucide-react';
-import { departmentList } from '../types';
+import { departmentList, getDeptName } from '../types';
 
 interface SystemTimeAnalyticsTabProps {
   selectedDepartment: string;
@@ -107,7 +107,7 @@ export const SystemTimeAnalyticsTab: React.FC<SystemTimeAnalyticsTabProps> = ({
             const pdfRows = displayStudents.map((item: any) => [
               `#${item?.rank || ''}`,
               fixTR(item?.student || ''),
-              selectedDepartment ? fixTR(String(selectedDepartment).toUpperCase()) : "COCUK GELISIMI",
+              selectedDepartment ? fixTR(getDeptName(selectedDepartment).toUpperCase()) : "SIYASET BILIMI VE KAMU YONETIMI",
               fixTR(convertHoursToText(item?.time || 0))
             ]);
 
