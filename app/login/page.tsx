@@ -5,7 +5,7 @@ import api from '@/lib/api';
 import Link from 'next/link';
 import { jwtDecode } from 'jwt-decode';
 import { AxiosError } from 'axios';
-import { Eye, EyeOff, Info, PlayCircle } from 'lucide-react';
+import { Eye, EyeOff, Info, PlayCircle, AlertCircle } from 'lucide-react';
 import { IntroVideoModal } from './components/IntroVideoModal';
 
 interface CustomTokenPayload {
@@ -27,6 +27,7 @@ export default function LoginPage() {
   const [showInfoTooltip, setShowInfoTooltip] = useState(false);
   const [loading, setLoading] = useState(false);
   const [isIntroModalOpen, setIsIntroModalOpen] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const router = useRouter();
 
   useEffect(() => {
@@ -72,6 +73,7 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMessage(null);
     
     try {
       const res = await api.post('/users/login/', { email, password, remember_me: rememberMe });
@@ -87,20 +89,33 @@ export default function LoginPage() {
 
       const decoded = jwtDecode<CustomTokenPayload>(access);
       
-      // Token içeriğini görmek için kullandığınız alert'ten departmanı sildik
       console.log("Giriş Yapan Kullanıcı:", decoded.full_name);
 
-      // Yönlendirme mantığı
       if (decoded.is_teacher) {
         router.push('/teacher-dashboard');
       } else {
-        // Öğrenci veya diğer roller için varsayılan dashboard
         router.push('/dashboard');
       }
       
-    } catch (err) {
-      const error = err as AxiosError<{ detail?: string }>;
-      alert(error.response?.data?.detail || "Giriş başarısız! Bilgilerinizi kontrol edin.");
+    } catch (err: any) {
+      const errorData = err.response?.data;
+      if (errorData) {
+        if (typeof errorData.detail === 'string') {
+          setErrorMessage(errorData.detail);
+        } else if (Array.isArray(errorData.detail)) {
+          setErrorMessage(errorData.detail[0]);
+        } else if (errorData.non_field_errors) {
+          setErrorMessage(
+            Array.isArray(errorData.non_field_errors)
+              ? errorData.non_field_errors[0]
+              : "Email veya şifreniz yanlıştır."
+          );
+        } else {
+          setErrorMessage("Email veya şifreniz yanlıştır.");
+        }
+      } else {
+        setErrorMessage("Email veya şifreniz yanlıştır.");
+      }
     } finally {
       setLoading(false);
     }
@@ -114,6 +129,30 @@ export default function LoginPage() {
           <h3 className="logo-text text-2xl text-gray-800 font-bold uppercase">Üniversitesi</h3>
           <p className="mt-4 font-roboto text-gray-600 font-medium">LMS Giriş Sistemi</p>
         </div>
+
+        {/* Hata Bildirim Uyarısı (Kurumsal Kırmızı-Beyaz Tema) */}
+        {errorMessage && (
+          <div className="bg-red-50 border-2 border-primary rounded-xl p-4 text-red-900 shadow-md animate-in fade-in slide-in-from-top-2 flex items-start gap-3 text-left">
+            <AlertCircle className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+            <div className="text-xs font-bold leading-relaxed flex-1">
+              {errorMessage.includes("yapayzekadesteklidijitalsinif.com.tr") ? (
+                <span>
+                  <a 
+                    href="https://yapayzekadesteklidijitalsinif.com.tr" 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="underline text-primary hover:text-red-700 font-extrabold"
+                  >
+                    yapayzekadesteklidijitalsinif.com.tr
+                  </a>
+                  {" den giriş yapmayı deneyiniz."}
+                </span>
+              ) : (
+                errorMessage
+              )}
+            </div>
+          </div>
+        )}
 
         <form onSubmit={handleLogin} className="mt-8 space-y-6">
           <div className="space-y-4">
