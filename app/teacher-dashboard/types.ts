@@ -62,6 +62,7 @@ export interface ChatbotReportData {
   total_count: number;
   questions: {
     text: string;
+    ai_response?: string;
     week: number | string;
     date: string;
   }[];

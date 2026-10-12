@@ -106,15 +106,28 @@ export const ChatbotAnalyticsTab: React.FC<ChatbotAnalyticsTabProps> = ({
                     </span>
                   </td>
                   <td className="p-6">
-                    <div className="flex flex-col gap-3 max-h-64 overflow-y-auto pr-3 custom-scrollbar">
+                    <div className="flex flex-col gap-3 max-h-96 overflow-y-auto pr-3 custom-scrollbar">
                       {student.questions.length > 0 ? (
                         student.questions.map((q, qi) => (
-                          <div key={qi} className="bg-white p-3 rounded-2xl border border-gray-100 hover:border-red-200 transition-colors shadow-sm">
-                            <div className="flex justify-between text-[8px] font-black text-gray-400 uppercase mb-2 tracking-tighter leading-none">
+                          <div key={qi} className="bg-white p-4 rounded-2xl border border-gray-100 hover:border-red-200 transition-colors shadow-sm space-y-2.5">
+                            <div className="flex justify-between items-center text-[8px] font-black text-gray-400 uppercase tracking-tighter leading-none">
                               <span className="flex items-center gap-1"><Calendar size={10} className="text-[#ce1212]" /> {q.date}</span>
                               <span className="bg-[#ce1212] px-2 py-0.5 rounded-full text-white font-black">HAFTA {q.week}</span>
                             </div>
-                            <p className="text-[11px] text-gray-700 font-medium italic leading-relaxed">&quot;{q.text}&quot;</p>
+                            <div>
+                              <span className="text-[9px] font-black uppercase text-[#ce1212] tracking-wider block mb-0.5">Öğrenci Sorusu:</span>
+                              <p className="text-[11px] text-gray-800 font-semibold italic leading-relaxed">&quot;{q.text}&quot;</p>
+                            </div>
+                            {q.ai_response ? (
+                              <div className="bg-gray-50 p-3 rounded-xl border border-gray-100 text-left">
+                                <span className="flex items-center gap-1.5 text-[9px] font-black uppercase text-emerald-700 tracking-wider mb-1">
+                                  <Bot size={12} className="text-emerald-600" /> Chatbot Yanıtı:
+                                </span>
+                                <p className="text-[11px] text-gray-700 font-normal leading-relaxed whitespace-pre-wrap">
+                                  {q.ai_response}
+                                </p>
+                              </div>
+                            ) : null}
                           </div>
                         ))
                       ) : (
