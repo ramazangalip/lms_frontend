@@ -58,6 +58,7 @@ export interface QuizDetailAnalysis {
 
 export interface ChatbotReportData {
   student_name: string;
+  category?: string;
   total_count: number;
   questions: {
     text: string;
@@ -99,6 +100,7 @@ export interface BulkStudentData {
   full_name: string;
   email: string;
   department: string;
+  category?: string;
   total_points: number;
   pre_test_score?: string;
   total_time: number;
@@ -141,6 +143,7 @@ export interface StudentAnalytics {
   last_name: string;
   email: string;
   department: string;
+  category?: string;
   total_points: number;
   total_time_spent: string;
   overall_progress: number;

@@ -409,12 +409,16 @@ export default function TeacherDashboard() {
   };
 
   const filteredAnalytics = useMemo(() => {
-    return analytics;
+    return analytics.filter(s => !s.category || s.category.toLowerCase() === 'd1');
   }, [analytics]);
 
   const filteredBulkData = useMemo(() => {
-    return bulkData;
+    return bulkData.filter(s => !s.category || s.category.toLowerCase() === 'd1');
   }, [bulkData]);
+
+  const filteredChatbotData = useMemo(() => {
+    return chatbotData.filter(s => !s.category || s.category.toLowerCase() === 'd1');
+  }, [chatbotData]);
 
   // Materyal Etkileşimleri
   const addMaterialRow = () => {
@@ -677,7 +681,7 @@ export default function TeacherDashboard() {
         selectedDepartment={selectedDepartment} 
       />
       <ChatbotReportPdf 
-        chatbotData={chatbotData} 
+        chatbotData={filteredChatbotData} 
         selectedDepartment={selectedDepartment} 
       />
 
@@ -751,7 +755,7 @@ export default function TeacherDashboard() {
         {activeTab === 'analytics' && (
           <StudentAnalyticsTab
             totalCount={totalCount}
-            analytics={analytics}
+            analytics={filteredAnalytics}
             selectedDepartment={selectedDepartment}
             setSelectedDepartment={setSelectedDepartment}
             currentPage={currentPage}
@@ -768,7 +772,7 @@ export default function TeacherDashboard() {
           <ChatbotAnalyticsTab
             selectedDepartment={selectedDepartment}
             setSelectedDepartment={setSelectedDepartment}
-            chatbotData={chatbotData}
+            chatbotData={filteredChatbotData}
             handlePrintChatbot={handlePrintChatbot}
           />
         )}
