@@ -110,145 +110,163 @@ export const BulkReportPdf: React.FC<BulkReportPdfProps> = ({
                     </td>
 
                     {/* HAFTALIK VERİLER (H.1 - H.14) */}
-                    {student.weekly_breakdown.map((week, wIdx) => (
-                      <td
-                        key={wIdx}
-                        className="border-2 border-black p-1 text-[9px] font-bold leading-tight align-top overflow-hidden"
-                      >
-                        <div className="flex flex-col h-full justify-between gap-1 text-left">
-                          {/* 1. TUR KARTI (T1) */}
-                          <div className="rounded-lg border border-[#bfdbfe] bg-[#f8faff] p-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-left">
-                            {/* Üst Satır: T1 & % İlerleme */}
-                            <div className="flex justify-between items-center w-full">
-                              <span className="text-[#1e3a8a] font-black text-[9px] leading-none">T1</span>
-                              <span className="text-[#2563eb] font-black text-[9px] leading-none">%{Math.round(week.progress)}</span>
+                    {student.weekly_breakdown.map((week, wIdx) => {
+                      const hasContent = week.has_content ?? (week.material_details && week.material_details.length > 0);
+
+                      if (!hasContent) {
+                        return (
+                          <td
+                            key={wIdx}
+                            className="border-2 border-black p-1 text-[8px] font-bold leading-tight align-middle text-center bg-gray-50/30"
+                          >
+                            <span className="text-[7.5px] text-gray-300 font-semibold italic select-none">İçerik Yok</span>
+                          </td>
+                        );
+                      }
+
+                      const hasQuiz1 = week.has_quiz_1 ?? ((week.score_1 !== undefined && week.score_1 !== null) || (week.correct > 0 || week.wrong > 0));
+                      const hasQuiz2 = week.has_quiz_2 ?? ((week.score_2 !== undefined && week.score_2 !== null) || (week.correct_2 > 0 || week.wrong_2 > 0));
+
+                      const hasT2Duration = (week.duration_seconds_2 && week.duration_seconds_2 > 0);
+                      const hasT2Progress = week.progress_2 !== undefined && week.progress_2 > 0;
+                      const hasT2 = week.is_round_2_started || hasT2Duration || hasT2Progress || hasQuiz2;
+
+                      return (
+                        <td
+                          key={wIdx}
+                          className="border-2 border-black p-1 text-[9px] font-bold leading-tight align-top overflow-hidden"
+                        >
+                          <div className="flex flex-col h-full justify-between gap-1 text-left">
+                            {/* 1. TUR KARTI (T1) */}
+                            <div className="rounded-lg border border-[#bfdbfe] bg-[#f8faff] p-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-left">
+                              {/* Üst Satır: T1 & % İlerleme */}
+                              <div className="flex justify-between items-center w-full">
+                                <span className="text-[#1e3a8a] font-black text-[9px] leading-none">T1</span>
+                                <span className="text-[#2563eb] font-black text-[9px] leading-none">%{Math.round(week.progress)}</span>
+                              </div>
+
+                              {/* İkinci Satır: Doğru/Yanlış ve T1 Süresi */}
+                              <div className="flex justify-between items-center w-full mt-1">
+                                <span className="text-gray-400 font-bold text-[7.5px] leading-none">
+                                  {hasQuiz1 ? `${week.correct || 0}D / ${week.wrong || 0}Y` : "Sınav Girilmedi"}
+                                </span>
+                                <span className="text-gray-700 font-bold text-[7.5px] leading-none">
+                                  T1: {formatDuration(week.duration_seconds || 0)}
+                                </span>
+                              </div>
+
+                              {/* Kalibrasyon Satırı (Tahmin & Gerçek & Fark) */}
+                              {(() => {
+                                if (!hasQuiz1) return null;
+                                const hasPred = week.predicted_score_1 !== undefined && week.predicted_score_1 !== null;
+                                const pred = hasPred ? Math.round(week.predicted_score_1!) : null;
+                                const real = week.score_1 !== undefined && week.score_1 !== null
+                                  ? Math.round(week.score_1)
+                                  : ((week.correct + week.wrong > 0) ? Math.round((week.correct / (week.correct + week.wrong)) * 100) : null);
+
+                                if (pred !== null || real !== null) {
+                                  const diff = (real ?? 0) - (pred ?? 0);
+                                  const diffStr = diff > 0 ? `+${diff}` : `${diff}`;
+                                  return (
+                                    <>
+                                      <div className="border-t border-gray-200/80 my-1 w-full" />
+                                      <div className="flex items-center text-[7px] leading-tight font-bold text-gray-800 whitespace-nowrap">
+                                        <span>T:% {pred ?? '-'} G:% {real ?? '-'}</span>
+                                        {pred !== null && real !== null && (
+                                          <span className={`ml-1 font-black ${diff >= 0 ? 'text-[#15803d]' : 'text-[#c2410c]'}`}>
+                                            (F: {diffStr})
+                                          </span>
+                                        )}
+                                      </div>
+                                    </>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </div>
 
-                            {/* İkinci Satır: Doğru/Yanlış ve T1 Süresi */}
-                            <div className="flex justify-between items-center w-full mt-1">
-                              <span className="text-gray-400 font-bold text-[7.5px] leading-none">
-                                {week.correct || 0}D / {week.wrong || 0}Y
+                            {/* 2. MATERYALLER BAŞLIĞI VE LİSTESİ */}
+                            <div className="flex flex-col text-left my-1">
+                              <span className="text-[7.5px] font-black text-[#64748b] uppercase tracking-wider text-left mb-1">
+                                MATERYALLER
                               </span>
-                              <span className="text-gray-700 font-bold text-[7.5px] leading-none">
-                                T1: {formatDuration(week.duration_seconds || 0)}
-                              </span>
-                            </div>
-
-                            {/* Kalibrasyon Satırı (Tahmin & Gerçek & Fark) */}
-                            {(() => {
-                              const hasPred = week.predicted_score_1 !== undefined && week.predicted_score_1 !== null;
-                              const pred = hasPred ? Math.round(week.predicted_score_1!) : null;
-                              const real = week.score_1 !== undefined && week.score_1 !== null
-                                ? Math.round(week.score_1)
-                                : ((week.correct + week.wrong > 0) ? Math.round((week.correct / (week.correct + week.wrong)) * 100) : null);
-
-                              if (pred !== null || real !== null) {
-                                const diff = (real ?? 0) - (pred ?? 0);
-                                const diffStr = diff > 0 ? `+${diff}` : `${diff}`;
-                                return (
-                                  <>
-                                    <div className="border-t border-gray-200/80 my-1 w-full" />
-                                    <div className="flex items-center text-[7px] leading-tight font-bold text-gray-800 whitespace-nowrap">
-                                      <span>T:% {pred ?? '-'} G:% {real ?? '-'}</span>
-                                      {pred !== null && real !== null && (
-                                        <span className={`ml-1 font-black ${diff >= 0 ? 'text-[#15803d]' : 'text-[#c2410c]'}`}>
-                                          (F: {diffStr})
-                                        </span>
-                                      )}
+                              {week.material_details && week.material_details.length > 0 ? (
+                                <div className="flex flex-col gap-1 text-left">
+                                  {week.material_details.map((mat, mi) => (
+                                    <div key={mi} className="flex flex-col text-left leading-tight">
+                                      <span className="font-bold text-[7.5px] text-gray-900 leading-tight break-words">
+                                        • {mat.title}
+                                      </span>
+                                      <span className="font-mono font-bold text-[7px] text-[#dc2626] leading-tight pl-2">
+                                        [ T1: {formatDuration(mat.duration_seconds_t1 || 0)} | T2: {formatDuration(mat.duration_seconds_t2 || 0)} ]
+                                      </span>
                                     </div>
-                                  </>
-                                );
-                              }
-                              return null;
-                            })()}
-                          </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <span className="text-[7px] text-gray-400 italic text-left pl-1">Materyal kaydı yok</span>
+                              )}
+                            </div>
 
-                          {/* 2. MATERYALLER BAŞLIĞI VE LİSTESİ */}
-                          <div className="flex flex-col text-left my-1">
-                            <span className="text-[7.5px] font-black text-[#64748b] uppercase tracking-wider text-left mb-1">
-                              MATERYALLER
-                            </span>
-                            {week.material_details && week.material_details.length > 0 ? (
-                              <div className="flex flex-col gap-1 text-left">
-                                {week.material_details.map((mat, mi) => (
-                                  <div key={mi} className="flex flex-col text-left leading-tight">
-                                    <span className="font-bold text-[7.5px] text-gray-900 leading-tight break-words">
-                                      • {mat.title}
+                            {/* 3. TUR KARTI (T2) */}
+                            {(() => {
+                              if (!hasT2) return null;
+
+                              const t2Progress = week.progress_2 !== undefined && week.progress_2 !== null
+                                ? Math.round(week.progress_2)
+                                : (hasQuiz2 ? 100 : (week.is_round_2_started ? 50 : 0));
+
+                              const hasPred2 = week.predicted_score_2 !== undefined && week.predicted_score_2 !== null;
+                              const pred2 = hasPred2 ? Math.round(week.predicted_score_2!) : null;
+                              const real2 = (hasQuiz2 && week.score_2 !== undefined && week.score_2 !== null)
+                                ? Math.round(week.score_2)
+                                : (hasQuiz2 && (week.correct_2 + week.wrong_2 > 0) ? Math.round((week.correct_2 / (week.correct_2 + week.wrong_2)) * 100) : null);
+
+                              return (
+                                <div className="rounded-lg border border-[#fde047] bg-[#fffbeb] p-1.5 mt-auto text-left shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                                  {/* Üst Satır: T2 & % İlerleme */}
+                                  <div className="flex justify-between items-center w-full">
+                                    <span className="text-[#92400e] font-black text-[9px] leading-none">T2</span>
+                                    <span className="text-[#92400e] font-black text-[9px] leading-none">%{t2Progress}</span>
+                                  </div>
+
+                                  {/* İkinci Satır: Doğru/Yanlış ve T2 Süresi */}
+                                  <div className="flex justify-between items-center w-full mt-1">
+                                    <span className="text-gray-400 font-bold text-[7.5px] leading-none">
+                                      {hasQuiz2 ? `${week.correct_2 || 0}D / ${week.wrong_2 || 0}Y` : "Sınav Çözülmedi"}
                                     </span>
-                                    <span className="font-mono font-bold text-[7px] text-[#dc2626] leading-tight pl-2">
-                                      [ T1: {formatDuration(mat.duration_seconds_t1 || 0)} | T2: {formatDuration(mat.duration_seconds_t2 || 0)} ]
+                                    <span className="text-gray-700 font-bold text-[7.5px] leading-none">
+                                      T2: {formatDuration(week.duration_seconds_2 || 0)}
                                     </span>
                                   </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <span className="text-[7px] text-gray-400 italic text-left pl-1">Materyal kaydı yok</span>
-                            )}
+
+                                  {/* Kalibrasyon Satırı (Tahmin & Gerçek & Fark) */}
+                                  {hasQuiz2 && (pred2 !== null || real2 !== null) && (
+                                    <>
+                                      <div className="border-t border-amber-200/80 my-1 w-full" />
+                                      {(() => {
+                                        const diff2 = (real2 ?? 0) - (pred2 ?? 0);
+                                        const diffStr2 = diff2 > 0 ? `+${diff2}` : `${diff2}`;
+                                        return (
+                                          <div className="flex items-center text-[7px] leading-tight font-bold text-gray-800 whitespace-nowrap">
+                                            <span>T:% {pred2 ?? '-'} G:% {real2 ?? '-'}</span>
+                                            {pred2 !== null && real2 !== null && (
+                                              <span className={`ml-1 font-black ${diff2 >= 0 ? 'text-[#15803d]' : 'text-[#c2410c]'}`}>
+                                                (F: {diffStr2})
+                                              </span>
+                                            )}
+                                          </div>
+                                        );
+                                      })()}
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </div>
-
-                          {/* 3. TUR KARTI (T2) */}
-                          {(() => {
-                            const hasT2 = week.is_round_2_started || 
-                              (week.duration_seconds_2 && week.duration_seconds_2 > 0) || 
-                              (week.correct_2 > 0 || week.wrong_2 > 0) || 
-                              (week.predicted_score_2 !== null && week.predicted_score_2 !== undefined);
-                            
-                            if (!hasT2) return null;
-
-                            const t2Progress = (week.correct_2 > 0 || week.wrong_2 > 0 || (week.score_2 !== undefined && week.score_2 !== null))
-                              ? 100 
-                              : (week.is_round_2_started ? 50 : 0);
-
-                            const hasPred2 = week.predicted_score_2 !== undefined && week.predicted_score_2 !== null;
-                            const pred2 = hasPred2 ? Math.round(week.predicted_score_2!) : null;
-                            const real2 = week.score_2 !== undefined && week.score_2 !== null
-                              ? Math.round(week.score_2)
-                              : ((week.correct_2 + week.wrong_2 > 0) ? Math.round((week.correct_2 / (week.correct_2 + week.wrong_2)) * 100) : null);
-
-                            return (
-                              <div className="rounded-lg border border-[#fde047] bg-[#fffbeb] p-1.5 mt-auto text-left shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-                                {/* Üst Satır: T2 & % İlerleme */}
-                                <div className="flex justify-between items-center w-full">
-                                  <span className="text-[#92400e] font-black text-[9px] leading-none">T2</span>
-                                  <span className="text-[#92400e] font-black text-[9px] leading-none">%{t2Progress}</span>
-                                </div>
-
-                                {/* İkinci Satır: Doğru/Yanlış ve T2 Süresi */}
-                                <div className="flex justify-between items-center w-full mt-1">
-                                  <span className="text-gray-400 font-bold text-[7.5px] leading-none">
-                                    {week.correct_2 || 0}D / {week.wrong_2 || 0}Y
-                                  </span>
-                                  <span className="text-gray-700 font-bold text-[7.5px] leading-none">
-                                    T2: {formatDuration(week.duration_seconds_2 || 0)}
-                                  </span>
-                                </div>
-
-                                {/* Kalibrasyon Satırı (Tahmin & Gerçek & Fark) */}
-                                {(pred2 !== null || real2 !== null) && (
-                                  <>
-                                    <div className="border-t border-amber-200/80 my-1 w-full" />
-                                    {(() => {
-                                      const diff2 = (real2 ?? 0) - (pred2 ?? 0);
-                                      const diffStr2 = diff2 > 0 ? `+${diff2}` : `${diff2}`;
-                                      return (
-                                        <div className="flex items-center text-[7px] leading-tight font-bold text-gray-800 whitespace-nowrap">
-                                          <span>T:% {pred2 ?? '-'} G:% {real2 ?? '-'}</span>
-                                          {pred2 !== null && real2 !== null && (
-                                            <span className={`ml-1 font-black ${diff2 >= 0 ? 'text-[#15803d]' : 'text-[#c2410c]'}`}>
-                                              (F: {diffStr2})
-                                            </span>
-                                          )}
-                                        </div>
-                                      );
-                                    })()}
-                                  </>
-                                )}
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      </td>
-                    ))}
+                        </td>
+                      );
+                    })}
 
                     {/* GENEL TOPLAM KOLONU */}
                     <td className="border-2 border-black p-1.5 bg-gray-100 align-middle">

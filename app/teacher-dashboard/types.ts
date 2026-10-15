@@ -70,12 +70,16 @@ export interface ChatbotReportData {
 
 export interface WeeklyProgress {
   week_number: number;
+  has_content?: boolean;
   progress: number;
+  progress_2?: number;
   duration: string | number;
   duration_seconds?: number;
   duration_2?: string | number;
-  score_1?: number;
-  score_2?: number;
+  score_1?: number | null;
+  score_2?: number | null;
+  has_quiz_1?: boolean;
+  has_quiz_2?: boolean;
   predicted_score_1?: number | null;
   calibration_gap_1?: number | null;
   predicted_score_2?: number | null;
@@ -109,7 +113,9 @@ export interface BulkStudentData {
   total_time_t2?: number;
   weekly_breakdown: {
     week: number;
+    has_content?: boolean;
     progress: number;
+    progress_2?: number;
     duration: string | number;
     duration_seconds: number;
     duration_seconds_2: number;
@@ -117,8 +123,10 @@ export interface BulkStudentData {
     wrong: number;
     correct_2: number;
     wrong_2: number;
-    score_1?: number;
-    score_2?: number;
+    score_1?: number | null;
+    score_2?: number | null;
+    has_quiz_1?: boolean;
+    has_quiz_2?: boolean;
     predicted_score_1?: number | null;
     calibration_gap_1?: number | null;
     predicted_score_2?: number | null;

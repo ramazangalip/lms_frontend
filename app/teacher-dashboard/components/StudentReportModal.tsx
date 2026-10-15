@@ -83,7 +83,7 @@ export const StudentReportModal: React.FC<StudentReportModalProps> = ({
 
         {/* HAFTALIK DETAYLAR LİSTESİ */}
         <div className="flex-1 overflow-y-auto p-4 md:p-10 space-y-8 bg-white custom-scrollbar text-left leading-normal">
-          {selectedStudent.weekly_breakdown?.map((week) => (
+          {selectedStudent.weekly_breakdown?.filter(w => w.has_content !== false).map((week) => (
             <div key={week.week_number} className="p-6 md:p-8 bg-gray-50 rounded-[2.5rem] border border-gray-100 space-y-6 relative overflow-hidden text-left leading-normal">
 
               {/* HAFTA BAŞLIĞI */}
