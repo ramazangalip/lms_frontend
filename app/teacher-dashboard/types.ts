@@ -237,3 +237,63 @@ export const formatDuration = (duration: string | number) => {
   const minutes = totalMinutes % 60;
   return `${hours} sa ${minutes} dk`;
 };
+
+// --- HAFTALIK ÖN DEĞERLENDİRME VE TELAFİ ANALİZİ TİPLERİ ---
+
+export interface WeeklyPreTestWrongAnswer {
+  question_id: number;
+  question_text: string;
+  target_week: number | null;
+  selected_option_id: number | null;
+  selected_option_text: string;
+  correct_option_text: string;
+}
+
+export interface WeeklyPreTestDetail {
+  appearing_week: number;
+  appearing_week_title: string;
+  is_completed: boolean;
+  completed_at: string | null;
+  correct_count: number;
+  wrong_count: number;
+  score_percentage: number;
+  unlocked_weeks: number[];
+  wrong_answers: WeeklyPreTestWrongAnswer[];
+}
+
+export interface RemediationMaterialStat {
+  material_id: number;
+  title: string;
+  content_type: string;
+  duration_seconds: number;
+  is_completed: boolean;
+}
+
+export interface RemediationRecord {
+  week_number: number;
+  week_title: string;
+  is_active: boolean;
+  remaining_hours: number;
+  unlocked_at: string | null;
+  unlock_until: string | null;
+  remediation_duration_seconds: number;
+  completion_percentage: number;
+  is_completed: boolean;
+  materials: RemediationMaterialStat[];
+}
+
+export interface WeeklyPreTestStudentData {
+  student_id: number;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+  email: string;
+  department: string;
+  category: string;
+  total_pretests_taken: number;
+  total_wrong_questions: number;
+  active_locks_count: number;
+  total_remediation_duration_seconds: number;
+  pretests: WeeklyPreTestDetail[];
+  remediation_records: RemediationRecord[];
+}

@@ -98,6 +98,7 @@ export default function StudentDashboard() {
 
   const isQuizLocked = () => {
     if (!selectedWeek) return false;
+    if (selectedWeek.is_temporarily_unlocked) return true;
     const requiredMaterials = selectedWeek.materials.filter((m) => m.content_type !== 'form');
     return requiredMaterials.some((m) => !completedMaterials.includes(String(m.id)));
   };
@@ -362,6 +363,11 @@ export default function StudentDashboard() {
   const handleEntryTestSubmit = async () => {
     if (!selectedWeek || !selectedWeek.entry_questions) return;
 
+    if (selectedWeek.is_temporarily_unlocked) {
+      alert("Bu hafta telafi amacıyla açılmıştır. Telafi sürecinde ön değerlendirme testi çözülemez.");
+      return;
+    }
+
     if (Object.keys(entryAnswers).length < selectedWeek.entry_questions.length) {
       alert("Lütfen tüm hazırlık sorularını cevaplayın.");
       return;
@@ -376,11 +382,21 @@ export default function StudentDashboard() {
 
       const res = await api.post(`/contents/week/${selectedWeek.week_number}/submit-entry-test/`, { answers });
 
-      if (res.data.wrong_target_weeks && res.data.wrong_target_weeks.length > 0) {
+      const wrongWeeks = res.data.wrong_target_weeks || res.data.unlocked_week_numbers || [];
+      if (wrongWeeks.length > 0) {
         alert(
-          `Bazı soruları yanlış cevapladınız. Hatırlamanız için şu haftaların kilidi 2 günlüğüne açıldı: ${res.data.wrong_target_weeks.join(', ')}. hafta`
+          `Bazı soruları yanlış cevapladınız. Hatırlamanız ve telafi etmeniz için şu haftaların kilidi 2 günlüğüne açıldı: ${wrongWeeks.join(', ')}. hafta. Mevcut hafta içeriklerinize de erişebilirsiniz.`
         );
+      } else {
+        alert("Tebrikler! Hazırlık sorularının tümünü doğru cevapladınız. Hafta içeriklerine erişebilirsiniz.");
       }
+
+      setEntryResult({
+        unlockedWeeks: wrongWeeks,
+        isSuccess: true,
+        correctCount: res.data.correct_count ?? 0,
+        wrongCount: res.data.wrong_count ?? 0,
+      });
 
       setSurveyAnswers({});
       await fetchContents(true);
@@ -393,6 +409,10 @@ export default function StudentDashboard() {
   };
 
   const handleQuizSubmit = async (predictedScore?: number) => {
+    if (selectedWeek?.is_temporarily_unlocked) {
+      alert("Bu hafta telafi amacıyla açılmıştır. Telafi sürecinde haftalık değerlendirme testi çözülemez.");
+      return;
+    }
     const quizId = activeMaterial?.quiz?.id;
     if (!quizId || String(quizId) === 'undefined' || String(quizId) === 'null') {
       alert("Sınav verisi bulunamadı.");
@@ -702,7 +722,7 @@ export default function StudentDashboard() {
                 setPreTestAnswers={setPreTestAnswers}
                 handlePreTestSubmit={handlePreTestSubmit}
               />
-            ) : selectedWeek.is_survey_required ? (
+            ) : (selectedWeek.is_survey_required && !selectedWeek.is_temporarily_unlocked) ? (
               /* --- 1. ÖNCELİK: ANKET (SURVEY) KONTROLÜ --- */
               <SurveyGatekeeper
                 selectedWeek={selectedWeek}
@@ -711,7 +731,7 @@ export default function StudentDashboard() {
                 setSurveyAnswers={setSurveyAnswers}
                 handleSurveySubmit={handleSurveySubmit}
               />
-            ) : selectedWeek.is_entry_test_required ? (
+            ) : (selectedWeek.is_entry_test_required && !selectedWeek.is_temporarily_unlocked) ? (
               /* --- 2. ÖNCELİK: HAFTALIK GİRİŞ (HAZIRLIK) TESTİ --- */
               <EntryTestGatekeeper
                 selectedWeek={selectedWeek}
@@ -730,7 +750,11 @@ export default function StudentDashboard() {
                     <span className="bg-secondary text-white text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest">
                       HAFTA {selectedWeek.week_number}
                     </span>
-                    {selectedWeek.current_attempt_round > 1 && (
+                    {selectedWeek.is_temporarily_unlocked ? (
+                      <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border border-amber-300 animate-pulse">
+                        ⚡ TELAFİ SÜRECİ (2 GÜN AÇIK)
+                      </span>
+                    ) : selectedWeek.current_attempt_round > 1 && (
                       <span className="bg-amber-100 text-amber-700 text-[8px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border border-amber-200 animate-pulse">
                         <RefreshCcw size={8} className="inline mr-1" /> 2. TUR (GELİŞİM)
                       </span>
@@ -747,13 +771,17 @@ export default function StudentDashboard() {
                         <div className="flex-1 max-w-xs bg-gray-100 h-1.5 rounded-full overflow-hidden border shadow-inner">
                           <div
                             className={`h-full transition-all duration-1000 ${
-                              selectedWeek.progress === 100 ? 'bg-green-500' : 'bg-primary'
+                              selectedWeek.progress === 100
+                                ? 'bg-green-500'
+                                : selectedWeek.is_temporarily_unlocked
+                                ? 'bg-amber-500'
+                                : 'bg-primary'
                             }`}
                             style={{ width: `${selectedWeek.progress || 0}%` }}
                           />
                         </div>
-                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
-                          %{selectedWeek.progress || 0} TAMAMLANDI
+                        <span className={`text-[9px] font-black uppercase tracking-widest ${selectedWeek.is_temporarily_unlocked ? 'text-amber-700' : 'text-gray-400'}`}>
+                          %{selectedWeek.progress || 0} {selectedWeek.is_temporarily_unlocked ? 'TELAFİ TAMAMLANDI' : 'TAMAMLANDI'}
                         </span>
                       </div>
                     </div>

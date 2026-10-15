@@ -19,14 +19,17 @@ import {
   SurveyOption,
   SurveyQuestion,
   Survey,
-  SurveyAnalysisResult
+  SurveyAnalysisResult,
+  WeeklyPreTestStudentData
 } from './types';
 
 import { Header, TabType } from './components/Header';
 import { BulkReportPdf } from './components/BulkReportPdf';
 import { ChatbotReportPdf } from './components/ChatbotReportPdf';
+import { WeeklyPreTestReportPdf } from './components/WeeklyPreTestReportPdf';
 import { ContentManagementTab } from './components/ContentManagementTab';
 import { StudentAnalyticsTab } from './components/StudentAnalyticsTab';
+import { WeeklyPreTestAnalyticsTab } from './components/WeeklyPreTestAnalyticsTab';
 import { ChatbotAnalyticsTab } from './components/ChatbotAnalyticsTab';
 import { SurveyResultsTab } from './components/SurveyResultsTab';
 import { SystemTimeAnalyticsTab } from './components/SystemTimeAnalyticsTab';
@@ -39,6 +42,8 @@ export default function TeacherDashboard() {
   const [fetchingWeek, setFetchingWeek] = useState(false);
   const [analytics, setAnalytics] = useState<StudentAnalytics[]>([]);
   const [bulkData, setBulkData] = useState<BulkStudentData[]>([]);
+  const [weeklyPreTestData, setWeeklyPreTestData] = useState<WeeklyPreTestStudentData[]>([]);
+  const [weeklyPreTestLoading, setWeeklyPreTestLoading] = useState<boolean>(false);
   const [selectedStudent, setSelectedStudent] = useState<StudentAnalytics | null>(null);
   const [selectedDepartment, setSelectedDepartment] = useState<string>('siyasetbilimi');
 
@@ -174,6 +179,22 @@ export default function TeacherDashboard() {
     }
   }, [selectedDepartment, selectedSurveyId, surveyPage]);
 
+  // --- 4. ÖN TEST VE TELAFİ ANALİZLERİNİ ÇEKME ---
+  const fetchWeeklyPreTestAnalytics = useCallback(async (dept = selectedDepartment) => {
+    if (!dept || dept === 'all') return;
+    setWeeklyPreTestLoading(true);
+    setWeeklyPreTestData([]);
+    try {
+      const res = await api.get(`/contents/teacher/weekly-pretest-analytics/?department=${dept}`);
+      setWeeklyPreTestData(res.data || []);
+    } catch (err) {
+      console.error("Ön test ve telafi verileri çekilemedi:", err);
+      setWeeklyPreTestData([]);
+    } finally {
+      setWeeklyPreTestLoading(false);
+    }
+  }, [selectedDepartment]);
+
   // Sekme ve bölüm değişiminde veri tetikleme
   useEffect(() => {
     if (!selectedDepartment || selectedDepartment === 'all') return;
@@ -181,13 +202,16 @@ export default function TeacherDashboard() {
     if (activeTab === 'analytics') {
       fetchAnalytics(selectedDepartment, currentPage);
     }
+    if (activeTab === 'weekly_pretest') {
+      fetchWeeklyPreTestAnalytics(selectedDepartment);
+    }
     if (activeTab === 'chatbot') {
       fetchChatbotAnalytics(selectedDepartment);
     }
     if (activeTab === 'survey_results') {
       fetchSurveyAnalytics(selectedDepartment, surveyPage); 
     }
-  }, [activeTab, selectedDepartment, currentPage, surveyPage, selectedSurveyId, fetchAnalytics, fetchChatbotAnalytics, fetchSurveyAnalytics]);
+  }, [activeTab, selectedDepartment, currentPage, surveyPage, selectedSurveyId, fetchAnalytics, fetchWeeklyPreTestAnalytics, fetchChatbotAnalytics, fetchSurveyAnalytics]);
 
   // Anket Soru İşlemleri
   const addSurveyQuestion = () => {
@@ -387,8 +411,10 @@ export default function TeacherDashboard() {
   const handlePrintChatbot = () => {
     const academicReport = document.getElementById('bulk-report-pdf');
     const chatbotReport = document.getElementById('chatbot-report-pdf');
+    const pretestReport = document.getElementById('weekly-pretest-report-pdf');
     
     if (academicReport) academicReport.style.display = 'none';
+    if (pretestReport) pretestReport.style.display = 'none';
     if (chatbotReport) chatbotReport.style.display = 'block';
     
     window.print();
@@ -399,13 +425,29 @@ export default function TeacherDashboard() {
   const handlePrintAcademic = () => {
     const academicReport = document.getElementById('bulk-report-pdf');
     const chatbotReport = document.getElementById('chatbot-report-pdf');
+    const pretestReport = document.getElementById('weekly-pretest-report-pdf');
     
     if (chatbotReport) chatbotReport.style.display = 'none';
+    if (pretestReport) pretestReport.style.display = 'none';
     if (academicReport) academicReport.style.display = 'block';
     
     window.print();
     
     if (academicReport) academicReport.style.display = 'none';
+  };
+
+  const handlePrintWeeklyPreTest = () => {
+    const academicReport = document.getElementById('bulk-report-pdf');
+    const chatbotReport = document.getElementById('chatbot-report-pdf');
+    const pretestReport = document.getElementById('weekly-pretest-report-pdf');
+    
+    if (academicReport) academicReport.style.display = 'none';
+    if (chatbotReport) chatbotReport.style.display = 'none';
+    if (pretestReport) pretestReport.style.display = 'block';
+    
+    window.print();
+    
+    if (pretestReport) pretestReport.style.display = 'none';
   };
 
   const filteredAnalytics = useMemo(() => {
@@ -419,6 +461,10 @@ export default function TeacherDashboard() {
   const filteredChatbotData = useMemo(() => {
     return chatbotData.filter(s => !s.category || s.category.toLowerCase() === 'd1');
   }, [chatbotData]);
+
+  const filteredWeeklyPreTestData = useMemo(() => {
+    return weeklyPreTestData.filter(s => !s.category || s.category.toLowerCase() === 'd1');
+  }, [weeklyPreTestData]);
 
   // Materyal Etkileşimleri
   const addMaterialRow = () => {
@@ -684,6 +730,10 @@ export default function TeacherDashboard() {
         chatbotData={filteredChatbotData} 
         selectedDepartment={selectedDepartment} 
       />
+      <WeeklyPreTestReportPdf 
+        weeklyPreTestData={filteredWeeklyPreTestData} 
+        selectedDepartment={selectedDepartment} 
+      />
 
       {/* 2. ÜST NAVİGASYON BAŞLIĞI */}
       <Header 
@@ -764,6 +814,17 @@ export default function TeacherDashboard() {
             handlePrintAcademic={handlePrintAcademic}
             setSelectedStudent={setSelectedStudent}
             loading={loading}
+          />
+        )}
+
+        {/* SEKME 2.5: ÖN TEST VE TELAFİ ANALİZİ */}
+        {activeTab === 'weekly_pretest' && (
+          <WeeklyPreTestAnalyticsTab
+            selectedDepartment={selectedDepartment}
+            setSelectedDepartment={setSelectedDepartment}
+            weeklyPreTestData={filteredWeeklyPreTestData}
+            loading={weeklyPreTestLoading}
+            handlePrintWeeklyPreTest={handlePrintWeeklyPreTest}
           />
         )}
 

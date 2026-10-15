@@ -115,60 +115,137 @@ export const BulkReportPdf: React.FC<BulkReportPdfProps> = ({
                         key={wIdx}
                         className="border-2 border-black p-1 text-[9px] font-bold leading-tight align-top overflow-hidden"
                       >
-                        <div className="flex flex-col gap-1 h-full justify-between">
-                          {/* TUR 1 BAŞARI & D/Y & HAFTALIK SÜRE ROZETİ */}
-                          <div className="flex flex-col border-b border-gray-300 pb-1 w-full items-center bg-blue-50/20 rounded-sm p-0.5">
-                            <div className="flex justify-between w-full px-0.5 mb-0.5">
-                              <span className="text-gray-500 font-black text-[8px]">T1</span>
-                              <span className="text-blue-700 font-black text-[10px]">%{Math.round(week.progress)}</span>
+                        <div className="flex flex-col h-full justify-between gap-1 text-left">
+                          {/* 1. TUR KARTI (T1) */}
+                          <div className="rounded-lg border border-[#bfdbfe] bg-[#f8faff] p-1.5 shadow-[0_1px_2px_rgba(0,0,0,0.02)] text-left">
+                            {/* Üst Satır: T1 & % İlerleme */}
+                            <div className="flex justify-between items-center w-full">
+                              <span className="text-[#1e3a8a] font-black text-[9px] leading-none">T1</span>
+                              <span className="text-[#2563eb] font-black text-[9px] leading-none">%{Math.round(week.progress)}</span>
                             </div>
-                            <div className="flex flex-col items-center gap-0.5 w-full">
-                              <span className="text-[8.5px] text-gray-800 font-bold">{week.correct}D / {week.wrong}Y</span>
-                              <span className="text-[8.5px] text-blue-700 font-black bg-blue-100/80 px-1 py-0.5 rounded w-full text-center">
-                                T1: {formatDuration(week.duration_seconds)}
+
+                            {/* İkinci Satır: Doğru/Yanlış ve T1 Süresi */}
+                            <div className="flex justify-between items-center w-full mt-1">
+                              <span className="text-gray-400 font-bold text-[7.5px] leading-none">
+                                {week.correct || 0}D / {week.wrong || 0}Y
+                              </span>
+                              <span className="text-gray-700 font-bold text-[7.5px] leading-none">
+                                T1: {formatDuration(week.duration_seconds || 0)}
                               </span>
                             </div>
+
+                            {/* Kalibrasyon Satırı (Tahmin & Gerçek & Fark) */}
+                            {(() => {
+                              const hasPred = week.predicted_score_1 !== undefined && week.predicted_score_1 !== null;
+                              const pred = hasPred ? Math.round(week.predicted_score_1!) : null;
+                              const real = week.score_1 !== undefined && week.score_1 !== null
+                                ? Math.round(week.score_1)
+                                : ((week.correct + week.wrong > 0) ? Math.round((week.correct / (week.correct + week.wrong)) * 100) : null);
+
+                              if (pred !== null || real !== null) {
+                                const diff = (real ?? 0) - (pred ?? 0);
+                                const diffStr = diff > 0 ? `+${diff}` : `${diff}`;
+                                return (
+                                  <>
+                                    <div className="border-t border-gray-200/80 my-1 w-full" />
+                                    <div className="flex items-center text-[7px] leading-tight font-bold text-gray-800 whitespace-nowrap">
+                                      <span>T:% {pred ?? '-'} G:% {real ?? '-'}</span>
+                                      {pred !== null && real !== null && (
+                                        <span className={`ml-1 font-black ${diff >= 0 ? 'text-[#15803d]' : 'text-[#c2410c]'}`}>
+                                          (F: {diffStr})
+                                        </span>
+                                      )}
+                                    </div>
+                                  </>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
 
-                          {/* KALİBRASYON GÖSTERGESİ (VARSA) */}
-                          {week.predicted_score_1 !== undefined && week.predicted_score_1 !== null ? (
-                            <div className="text-[7.5px] font-bold text-amber-900 bg-amber-50 px-1 py-0.5 rounded border border-amber-200 text-center my-0.5">
-                              Tahmin: %{week.predicted_score_1} | Gerçek: %{week.score_1} | Sapma: ±{week.calibration_gap_1}
-                            </div>
-                          ) : null}
-
-                          {/* MATERYALLER LİSTESİ */}
-                          <div className="flex flex-col gap-0.5 px-0.5 my-1">
-                            <p className="text-[8px] font-black text-gray-500 uppercase border-b border-gray-100 mb-0.5 text-left">
-                              Materyaller:
-                            </p>
+                          {/* 2. MATERYALLER BAŞLIĞI VE LİSTESİ */}
+                          <div className="flex flex-col text-left my-1">
+                            <span className="text-[7.5px] font-black text-[#64748b] uppercase tracking-wider text-left mb-1">
+                              MATERYALLER
+                            </span>
                             {week.material_details && week.material_details.length > 0 ? (
-                              week.material_details.map((mat, mi) => (
-                                <div
-                                  key={mi}
-                                  className="flex flex-col text-[8px] text-gray-700 leading-tight mb-1 border-b border-gray-50 pb-0.5"
-                                >
-                                  <span className="text-left font-semibold break-words">• {mat.title}</span>
-                                  <span className="font-bold text-[7.5px] text-red-700">
-                                    [T1: {formatDuration(mat.duration_seconds_t1 || 0)} | T2: {mat.duration_seconds_t2 ? formatDuration(mat.duration_seconds_t2) : '-'}]
-                                  </span>
-                                </div>
-                              ))
+                              <div className="flex flex-col gap-1 text-left">
+                                {week.material_details.map((mat, mi) => (
+                                  <div key={mi} className="flex flex-col text-left leading-tight">
+                                    <span className="font-bold text-[7.5px] text-gray-900 leading-tight break-words">
+                                      • {mat.title}
+                                    </span>
+                                    <span className="font-mono font-bold text-[7px] text-[#dc2626] leading-tight pl-2">
+                                      [ T1: {formatDuration(mat.duration_seconds_t1 || 0)} | T2: {formatDuration(mat.duration_seconds_t2 || 0)} ]
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
                             ) : (
-                              <span className="text-[7.5px] text-gray-400 italic text-center">Yok</span>
+                              <span className="text-[7px] text-gray-400 italic text-left pl-1">Materyal kaydı yok</span>
                             )}
                           </div>
 
-                          {/* TUR 2 VERİLERİ (VARS A) */}
-                          {week.is_round_2_started ? (
-                            <div className="flex flex-col w-full items-center pt-1 border-t border-amber-300 bg-amber-50/50 rounded-sm p-0.5 mt-auto">
-                              <span className="text-amber-800 font-black text-[8px]">T2 PEKİŞTİRME</span>
-                              <span className="text-green-700 font-bold text-[8.5px]">{week.correct_2}D / {week.wrong_2}Y</span>
-                              <span className="text-[8.5px] text-amber-800 font-black bg-amber-100 px-1 py-0.5 rounded w-full text-center">
-                                T2: {formatDuration(week.duration_seconds_2)}
-                              </span>
-                            </div>
-                          ) : null}
+                          {/* 3. TUR KARTI (T2) */}
+                          {(() => {
+                            const hasT2 = week.is_round_2_started || 
+                              (week.duration_seconds_2 && week.duration_seconds_2 > 0) || 
+                              (week.correct_2 > 0 || week.wrong_2 > 0) || 
+                              (week.predicted_score_2 !== null && week.predicted_score_2 !== undefined);
+                            
+                            if (!hasT2) return null;
+
+                            const t2Progress = (week.correct_2 > 0 || week.wrong_2 > 0 || (week.score_2 !== undefined && week.score_2 !== null))
+                              ? 100 
+                              : (week.is_round_2_started ? 50 : 0);
+
+                            const hasPred2 = week.predicted_score_2 !== undefined && week.predicted_score_2 !== null;
+                            const pred2 = hasPred2 ? Math.round(week.predicted_score_2!) : null;
+                            const real2 = week.score_2 !== undefined && week.score_2 !== null
+                              ? Math.round(week.score_2)
+                              : ((week.correct_2 + week.wrong_2 > 0) ? Math.round((week.correct_2 / (week.correct_2 + week.wrong_2)) * 100) : null);
+
+                            return (
+                              <div className="rounded-lg border border-[#fde047] bg-[#fffbeb] p-1.5 mt-auto text-left shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                                {/* Üst Satır: T2 & % İlerleme */}
+                                <div className="flex justify-between items-center w-full">
+                                  <span className="text-[#92400e] font-black text-[9px] leading-none">T2</span>
+                                  <span className="text-[#92400e] font-black text-[9px] leading-none">%{t2Progress}</span>
+                                </div>
+
+                                {/* İkinci Satır: Doğru/Yanlış ve T2 Süresi */}
+                                <div className="flex justify-between items-center w-full mt-1">
+                                  <span className="text-gray-400 font-bold text-[7.5px] leading-none">
+                                    {week.correct_2 || 0}D / {week.wrong_2 || 0}Y
+                                  </span>
+                                  <span className="text-gray-700 font-bold text-[7.5px] leading-none">
+                                    T2: {formatDuration(week.duration_seconds_2 || 0)}
+                                  </span>
+                                </div>
+
+                                {/* Kalibrasyon Satırı (Tahmin & Gerçek & Fark) */}
+                                {(pred2 !== null || real2 !== null) && (
+                                  <>
+                                    <div className="border-t border-amber-200/80 my-1 w-full" />
+                                    {(() => {
+                                      const diff2 = (real2 ?? 0) - (pred2 ?? 0);
+                                      const diffStr2 = diff2 > 0 ? `+${diff2}` : `${diff2}`;
+                                      return (
+                                        <div className="flex items-center text-[7px] leading-tight font-bold text-gray-800 whitespace-nowrap">
+                                          <span>T:% {pred2 ?? '-'} G:% {real2 ?? '-'}</span>
+                                          {pred2 !== null && real2 !== null && (
+                                            <span className={`ml-1 font-black ${diff2 >= 0 ? 'text-[#15803d]' : 'text-[#c2410c]'}`}>
+                                              (F: {diffStr2})
+                                            </span>
+                                          )}
+                                        </div>
+                                      );
+                                    })()}
+                                  </>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </td>
                     ))}

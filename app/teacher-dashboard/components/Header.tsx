@@ -7,10 +7,11 @@ import {
   Bot,
   PieChart,
   Clock,
+  ClipboardList,
   LogOut
 } from 'lucide-react';
 
-export type TabType = 'content' | 'analytics' | 'chatbot' | 'survey_results' | 'time_analytics';
+export type TabType = 'content' | 'analytics' | 'chatbot' | 'survey_results' | 'time_analytics' | 'weekly_pretest';
 
 interface HeaderProps {
   activeTab: TabType;
@@ -48,22 +49,28 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
             <BarChart3 size={14} /> ÖĞRENCİ ANALİZLERİ
           </button>
           <button 
+            onClick={() => setActiveTab('weekly_pretest')} 
+            className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 rounded-xl text-[11px] font-black transition-all whitespace-nowrap leading-none ${activeTab === 'weekly_pretest' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+          >
+            <ClipboardList size={14} /> ÖN TEST SONUÇLARI ANALİZİ
+          </button>
+          <button 
             onClick={() => setActiveTab('chatbot')} 
             className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 rounded-xl text-[11px] font-black transition-all whitespace-nowrap leading-none ${activeTab === 'chatbot' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
           >
             <Bot size={14} /> CHATBOT ANALİZİ
           </button>
-          <button 
+          {/* <button 
             onClick={() => setActiveTab('survey_results')} 
             className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 rounded-xl text-[11px] font-black transition-all whitespace-nowrap leading-none ${activeTab === 'survey_results' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
           >
             <PieChart size={14} /> ANKET SONUÇLARI
-          </button>
+          </button> */}
           <button 
             onClick={() => setActiveTab('time_analytics')} 
-            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-6 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap leading-none ${activeTab === 'time_analytics' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black transition-all whitespace-nowrap leading-none ${activeTab === 'time_analytics' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
           >
-            <Clock size={16} /> SİSTEM ZAMAN ANALİTİĞİ
+            <Clock size={14} /> SİSTEM ZAMAN ANALİTİĞİ
           </button>
         </div>
 

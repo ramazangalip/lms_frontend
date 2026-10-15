@@ -142,7 +142,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <div className="text-left leading-tight">
                     <p className="text-xs font-semibold">Hafta {num}</p>
                     {weekData?.is_temporarily_unlocked ? (
-                      <p className="text-[7px] bg-amber-500/20 text-amber-400 font-bold uppercase mt-0.5 px-1 rounded inline-block">⚡ 2 GÜN AÇIK</p>
+                      <div className="space-y-0.5">
+                        <p className="text-[7px] bg-amber-500/20 text-amber-400 font-bold uppercase mt-0.5 px-1.5 py-0.5 rounded inline-block">
+                          ⚡ TELAFİ (2 GÜN AÇIK)
+                        </p>
+                        <p className="text-[8px] font-black text-amber-400/90 uppercase tracking-widest">
+                          %{weekData.progress || 0} TELAFİ
+                        </p>
+                      </div>
                     ) : weekData && !isWeekLocked ? (
                       <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest mt-0.5">
                         %{weekData.progress || 0} TAMAMLANDI
