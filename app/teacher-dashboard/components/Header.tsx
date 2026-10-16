@@ -52,7 +52,7 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab }) => {
             onClick={() => setActiveTab('weekly_pretest')} 
             className={`flex-1 lg:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2.5 rounded-xl text-[11px] font-black transition-all whitespace-nowrap leading-none ${activeTab === 'weekly_pretest' ? 'bg-[#ce1212] text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
           >
-            <ClipboardList size={14} /> ÖN TEST SONUÇLARI ANALİZİ
+            <ClipboardList size={14} /> PEKİŞTİRME TESTİ ANALİZİ
           </button>
           <button 
             onClick={() => setActiveTab('chatbot')} 
