@@ -554,6 +554,7 @@ export default function TeacherDashboard() {
     if (newMats[mIndex].quiz) {
       newMats[mIndex].quiz!.questions.push({
         question_text: "",
+        topic: "",
         options: [
           { option_text: "", is_correct: true },
           { option_text: "", is_correct: false },
@@ -566,10 +567,31 @@ export default function TeacherDashboard() {
     setMaterials(newMats);
   };
 
+  const removeQuestion = (mIndex: number, qIndex: number) => {
+    const newMats = [...materials];
+    if (newMats[mIndex].quiz) {
+      if (newMats[mIndex].quiz!.questions.length > 1) {
+        newMats[mIndex].quiz!.questions = newMats[mIndex].quiz!.questions.filter((_, i) => i !== qIndex);
+      } else {
+        alert("Sınavda en az bir soru bulunmalıdır.");
+        return;
+      }
+    }
+    setMaterials(newMats);
+  };
+
   const updateQuestionText = (mIndex: number, qIndex: number, text: string) => {
     const newMats = [...materials];
     if (newMats[mIndex].quiz) {
       newMats[mIndex].quiz!.questions[qIndex].question_text = text;
+    }
+    setMaterials(newMats);
+  };
+
+  const updateQuestionTopic = (mIndex: number, qIndex: number, topic: string) => {
+    const newMats = [...materials];
+    if (newMats[mIndex].quiz) {
+      newMats[mIndex].quiz!.questions[qIndex].topic = topic;
     }
     setMaterials(newMats);
   };
@@ -658,16 +680,19 @@ export default function TeacherDashboard() {
                 ...(m.quiz.id ? { id: m.quiz.id } : {}),
                 title: m.quiz.title || m.title,
                 description: m.quiz.description || "",
-                questions: m.quiz.questions.map((q, qIdx) => ({
-                  ...(q.id ? { id: q.id } : {}),
-                  question_text: q.question_text,
-                  order: qIdx,
-                  options: q.options.map((opt) => ({
-                    ...(opt.id ? { id: opt.id } : {}),
-                    option_text: opt.option_text,
-                    is_correct: opt.is_correct
+                questions: m.quiz.questions
+                  .filter((q) => q.question_text.trim() !== "")
+                  .map((q, qIdx) => ({
+                    ...(q.id ? { id: q.id } : {}),
+                    question_text: q.question_text,
+                    topic: q.topic || "",
+                    order: qIdx,
+                    options: q.options.map((opt) => ({
+                      ...(opt.id ? { id: opt.id } : {}),
+                      option_text: opt.option_text,
+                      is_correct: opt.is_correct
+                    }))
                   }))
-                }))
               }
             } : {})
           })),
@@ -775,7 +800,9 @@ export default function TeacherDashboard() {
             removeMaterialRow={removeMaterialRow}
             updateMaterial={updateMaterial}
             addQuestion={addQuestion}
+            removeQuestion={removeQuestion}
             updateQuestionText={updateQuestionText}
+            updateQuestionTopic={updateQuestionTopic}
             updateOption={updateOption}
             setCorrectOption={setCorrectOption}
             flashcards={flashcards}

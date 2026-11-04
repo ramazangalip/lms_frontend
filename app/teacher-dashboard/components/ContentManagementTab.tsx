@@ -59,7 +59,9 @@ interface ContentManagementTabProps {
   removeMaterialRow: (index: number) => void;
   updateMaterial: (index: number, field: keyof Material, value: unknown) => void;
   addQuestion: (mIndex: number) => void;
+  removeQuestion?: (mIndex: number, qIndex: number) => void;
   updateQuestionText: (mIndex: number, qIndex: number, text: string) => void;
+  updateQuestionTopic?: (mIndex: number, qIndex: number, topic: string) => void;
   updateOption: (mIndex: number, qIndex: number, oIndex: number, text: string) => void;
   setCorrectOption: (mIndex: number, qIndex: number, oIndex: number) => void;
   flashcards: Flashcard[];
@@ -112,7 +114,9 @@ export const ContentManagementTab: React.FC<ContentManagementTabProps> = ({
   removeMaterialRow,
   updateMaterial,
   addQuestion,
+  removeQuestion,
   updateQuestionText,
+  updateQuestionTopic,
   updateOption,
   setCorrectOption,
   flashcards,
@@ -308,9 +312,31 @@ export const ContentManagementTab: React.FC<ContentManagementTabProps> = ({
                     <div className="space-y-8">
                       {mat.quiz.questions.map((q, qIndex) => (
                         <div key={qIndex} className="p-4 bg-gray-50/50 rounded-xl space-y-4 border border-gray-100">
-                          <div className="flex gap-4 items-start">
-                            <span className="bg-[#ce1212] text-white w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 shadow-md">{qIndex + 1}</span>
-                            <input type="text" placeholder="Soru metni..." className="w-full p-2.5 rounded-lg border text-xs font-bold focus:border-red-500 outline-none" value={q.question_text} onChange={(e) => updateQuestionText(mIndex, qIndex, e.target.value)} />
+                          <div className="flex flex-col sm:flex-row gap-3 items-start">
+                            <div className="flex gap-3 items-center w-full sm:flex-1">
+                              <span className="bg-[#ce1212] text-white w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0 shadow-md">{qIndex + 1}</span>
+                              <input type="text" placeholder="Soru metni..." className="w-full p-2.5 rounded-lg border text-xs font-bold focus:border-red-500 outline-none" value={q.question_text} onChange={(e) => updateQuestionText(mIndex, qIndex, e.target.value)} />
+                            </div>
+                            <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                              <input 
+                                type="text" 
+                                placeholder="Konu Başlığı (Opsiyonel)" 
+                                title="Bu sorunun ilgili olduğu konu başlığı / kazanım"
+                                className="w-full sm:w-60 md:w-64 p-2.5 rounded-lg border border-amber-200 bg-amber-50/40 text-xs font-semibold text-amber-900 placeholder:text-amber-500/70 focus:border-amber-500 focus:bg-white outline-none transition-all" 
+                                value={q.topic || ''} 
+                                onChange={(e) => updateQuestionTopic && updateQuestionTopic(mIndex, qIndex, e.target.value)} 
+                              />
+                              {removeQuestion && mat.quiz && mat.quiz.questions.length > 1 && (
+                                <button 
+                                  type="button" 
+                                  onClick={() => removeQuestion(mIndex, qIndex)} 
+                                  title="Soruyu Sil"
+                                  className="w-8 h-8 rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white flex items-center justify-center shrink-0 transition-all font-bold text-xs"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:pl-11">
                             {q.options.map((opt, oIndex) => (
