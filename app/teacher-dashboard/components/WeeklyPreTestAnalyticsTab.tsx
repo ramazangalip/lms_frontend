@@ -102,10 +102,10 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
             </span>
           </div>
           <h2 className="text-xl font-black text-[#1a1a1a] uppercase leading-none border-l-4 border-[#ce1212] pl-3 mt-2">
-            Ön Test Sonuçları & Telafi Analizi
+            Pekiştirme Testi Sonuçları & Telafi Analizi
           </h2>
           <p className="text-[10px] text-gray-400 font-bold uppercase mt-2 tracking-widest italic leading-none">
-            Haftalık Ön Değerlendirme Hataları ve Bağımsız Telafi Kilit Takibi
+            Haftalık Pekiştirme Testi Hataları ve Bağımsız Telafi Kilit Takibi
           </p>
         </div>
 
@@ -134,16 +134,7 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
         </div>
       </div>
 
-      {/* BİLGİLENDİRME BİLGİ KUTUSU */}
-      <div className="bg-blue-50/70 border-l-4 border-blue-500 p-4 rounded-2xl flex items-start gap-3 shadow-sm">
-        <AlertCircle size={20} className="text-blue-600 shrink-0 mt-0.5" />
-        <div className="text-[11px] text-blue-900 leading-relaxed font-medium">
-          <span className="font-black uppercase tracking-wider text-blue-950">Bağımsız Telafi Takibi Sistemi: </span>
-          Öğrencinin haftalık giriş testinde yanlış yaptığı konulara ait önceki haftaların kilidi <strong className="text-blue-950">2 günlüğüne telafi amaçlı</strong> açılır. 
-          Bu süreçte mevcut haftanın kilidi asla kapanmaz. Telafi sürecinde harcanan süreler, materyal tamamlamaları ve tamamlama yüzdeleri veritabanında ayrı tutulur; 
-          normal analizlerdeki <strong>T1, T2 sürelerini ve normal yüzdeleri kesinlikle etkilemez veya sıfırlamaz</strong>.
-        </div>
-      </div>
+    
 
       {/* ÖZET İSTATİSTİK KARTLARI */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -162,7 +153,7 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
             <CheckCircle2 size={26} />
           </div>
           <div>
-            <p className="text-gray-400 text-[9px] font-black uppercase tracking-widest mb-1">Ön Teste Girenler</p>
+            <p className="text-gray-400 text-[9px] font-black uppercase tracking-widest mb-1">Pekiştirme Testine Girenler</p>
             <p className="text-2xl font-black text-[#1a1a1a]">
               {pretestTakers} <span className="text-xs text-gray-400 font-bold">/ {totalD1Students}</span>
             </p>
@@ -225,7 +216,7 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
       {loading ? (
         <div className="bg-white p-16 rounded-3xl shadow-xl text-center space-y-4">
           <div className="w-12 h-12 border-4 border-[#ce1212] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-xs font-black uppercase tracking-widest text-gray-400">Ön Test ve Telafi Verileri Yükleniyor...</p>
+          <p className="text-xs font-black uppercase tracking-widest text-gray-400">Pekiştirme Testi ve Telafi Verileri Yükleniyor...</p>
         </div>
       ) : filteredData.length === 0 ? (
         <div className="bg-white p-16 rounded-3xl shadow-xl text-center space-y-3">
@@ -310,12 +301,12 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
                     <div className="space-y-4">
                       <h4 className="text-xs font-black uppercase tracking-widest text-secondary flex items-center gap-2 border-b border-gray-200 pb-2">
                         <ClipboardList size={16} className="text-[#ce1212]" /> 
-                        Haftalık Giriş Testi Performansı ve Yanlış Yapılan Sorular
+                        Haftalık Pekiştirme Testi Performansı ve Yanlış Yapılan Sorular
                       </h4>
 
                       {student.pretests.length === 0 ? (
                         <p className="text-xs text-gray-400 italic bg-white p-4 rounded-2xl border border-gray-200">
-                          Öğrenci henüz hiçbir haftanın ön değerlendirme testine katılmamıştır.
+                          Öğrenci henüz hiçbir haftanın pekiştirme testine katılmamıştır.
                         </p>
                       ) : (
                         <div className="space-y-4">
@@ -328,7 +319,7 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
                               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-100 pb-3">
                                 <div className="flex items-center gap-3">
                                   <span className="bg-secondary text-white text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider">
-                                    {pt.appearing_week}. HAFTA GİRİŞ TESTİ
+                                    {pt.appearing_week}. HAFTA PEKİŞTİRME TESTİ
                                   </span>
                                   {pt.completed_at && (
                                     <span className="text-[10px] text-gray-400 font-semibold">
