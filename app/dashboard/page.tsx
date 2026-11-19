@@ -5,7 +5,11 @@ import {
   PlayCircle,
   RefreshCcw,
   User,
-  Trophy
+  Trophy,
+  ChevronDown,
+  ChevronUp,
+  Calendar,
+  Award
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -34,6 +38,13 @@ export default function StudentDashboard() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [pointsEarned, setPointsEarned] = useState<{ show: boolean; amount: number }>({ show: false, amount: 0 });
   const [userTotalPoints, setUserTotalPoints] = useState(0);
+  const [isScoreDropdownOpen, setIsScoreDropdownOpen] = useState(false);
+  const [studentExamScore, setStudentExamScore] = useState<{
+    before_exam_points: number;
+    after_exam_points: number;
+    total_points: number;
+  } | null>(null);
+  const scoreDropdownRef = useRef<HTMLDivElement | null>(null);
   const trackingInterval = useRef<NodeJS.Timeout | null>(null);
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, number>>({});
   const [quizResult, setQuizResult] = useState<{ score: number; correct: number; wrong: number; predicted_score?: number; calibration_gap?: number } | null>(null);
@@ -230,9 +241,33 @@ export default function StudentDashboard() {
     }
   };
 
+  const fetchStudentExamScore = async () => {
+    try {
+      const res = await api.get('/contents/student-exam-score/');
+      setStudentExamScore(res.data);
+    } catch (err) {
+      console.error("Öğrenci sınav puanları çekilemedi:", err);
+    }
+  };
+
   useEffect(() => {
     fetchContents();
+    fetchStudentExamScore();
   }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (scoreDropdownRef.current && !scoreDropdownRef.current.contains(event.target as Node)) {
+        setIsScoreDropdownOpen(false);
+      }
+    };
+    if (isScoreDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isScoreDropdownOpen]);
 
   const handleCompleteMaterial = async (materialId: number | string) => {
     if (!materialId) return;
@@ -246,6 +281,7 @@ export default function StudentDashboard() {
       if (res.data.status === "success") {
         if (res.data.total_points !== undefined) {
           setUserTotalPoints(res.data.total_points);
+          fetchStudentExamScore();
         }
 
         if (res.data.new_points_earned > 0) {
@@ -787,29 +823,99 @@ export default function StudentDashboard() {
                     </div>
 
                     {/* SAĞ: PROFİL VE PUAN */}
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                       <Link
                         href="/profile"
-                        className="bg-white border-2 border-gray-50 rounded-2xl p-3 shadow-sm hover:shadow-md hover:border-blue-100 transition-all group flex items-center justify-center cursor-pointer"
+                        className="border border-blue-100/80 bg-[#f4f8ff] p-2 sm:p-2.5 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-sm hover:shadow-md transition-all group cursor-pointer shrink-0"
                       >
-                        <div className="bg-blue-500/10 p-2 rounded-xl group-hover:bg-blue-500 transition-colors">
-                          <User className="text-blue-600 group-hover:text-white" size={20} />
-                        </div>
+                        <User className="text-blue-500 group-hover:scale-110 transition-transform" size={18} />
                       </Link>
 
-                      <div className="bg-white border-2 border-gray-50 rounded-2xl p-3 shadow-sm flex items-center gap-3">
-                        <div className="bg-amber-400/10 p-2 rounded-xl">
-                          <Trophy className="text-amber-500" size={20} />
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-tighter leading-none mb-1">
-                            Toplam Puan
-                          </p>
-                          <p className="text-xl font-black text-secondary leading-none">
-                            {userTotalPoints || selectedWeek.total_score || 0}{' '}
-                            <span className="text-[10px] text-gray-400 font-bold">Puan</span>
-                          </p>
-                        </div>
+                      <div className="relative" ref={scoreDropdownRef}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsScoreDropdownOpen(!isScoreDropdownOpen);
+                            if (!isScoreDropdownOpen) fetchStudentExamScore();
+                          }}
+                          className={`border-2 rounded-xl sm:rounded-2xl p-1.5 px-3 sm:p-2 sm:px-3.5 shadow-sm cursor-pointer select-none flex items-center gap-2 sm:gap-2.5 transition-all ${
+                            isScoreDropdownOpen ? 'border-amber-400 bg-white shadow-md' : 'border-amber-300 bg-white hover:border-amber-400'
+                          }`}
+                        >
+                          <div className="bg-amber-100/60 p-1.5 sm:p-2 rounded-lg sm:rounded-xl text-amber-500 shrink-0">
+                            <Trophy size={16} className="sm:w-5 sm:h-5" />
+                          </div>
+                          <div className="text-left leading-none">
+                            <p className="text-[8px] sm:text-[9px] font-black text-slate-400 uppercase tracking-tighter leading-none mb-0.5 sm:mb-1">
+                              TOPLAM PUAN
+                            </p>
+                            <p className="text-sm sm:text-base md:text-lg font-black text-secondary leading-none">
+                              {studentExamScore?.total_points ?? userTotalPoints ?? selectedWeek.total_score ?? 0}{' '}
+                              <span className="text-[10px] text-slate-500 font-bold">Puan</span>
+                            </p>
+                          </div>
+                          <div className="text-amber-500 ml-0.5 sm:ml-1">
+                            {isScoreDropdownOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                          </div>
+                        </button>
+
+                        {/* DROPDOWN */}
+                        {isScoreDropdownOpen && (
+                          <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 w-[260px] sm:w-[280px] max-w-[calc(100vw-32px)] bg-white rounded-2xl p-3.5 sm:p-4 shadow-xl border border-gray-100 z-[100] animate-in fade-in slide-in-from-top-2 duration-200 text-left">
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-2.5">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                PUAN DAĞILIMI
+                              </span>
+                              <span className="text-[9px] font-bold text-amber-600 bg-amber-50 border border-amber-200/60 px-2.5 py-0.5 rounded-full cursor-default">
+                                Detay
+                              </span>
+                            </div>
+
+                            {/* Vizeden Önce */}
+                            <div className="bg-[#ecfdf5] border border-[#a7f3d0]/60 rounded-xl p-2.5 flex items-center justify-between mb-2 transition-all">
+                              <div className="flex items-center gap-2.5">
+                                <div className="bg-[#d1fae5] p-1.5 rounded-lg text-[#059669]">
+                                  <Calendar size={15} />
+                                </div>
+                                <span className="text-[11px] font-bold text-[#065f46]">
+                                  Vizeden Önce
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-black text-[#059669]">
+                                {studentExamScore?.before_exam_points ?? 0} Puan
+                              </span>
+                            </div>
+
+                            {/* Vizeden Sonra */}
+                            <div className="bg-[#faf5ff] border border-[#e9d5ff]/60 rounded-xl p-2.5 flex items-center justify-between mb-2.5 transition-all">
+                              <div className="flex items-center gap-2.5">
+                                <div className="bg-[#f3e8ff] p-1.5 rounded-lg text-[#9333ea]">
+                                  <Award size={15} />
+                                </div>
+                                <span className="text-[11px] font-bold text-[#581c87]">
+                                  Vizeden Sonra
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-black text-[#9333ea]">
+                                {studentExamScore?.after_exam_points ?? 0} Puan
+                              </span>
+                            </div>
+
+                            {/* Divider */}
+                            <div className="border-t border-gray-100 my-2" />
+
+                            {/* Toplam */}
+                            <div className="flex items-center justify-between pt-0.5">
+                              <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider">
+                                TOPLAM
+                              </span>
+                              <span className="text-xs sm:text-sm font-black text-amber-600">
+                                {studentExamScore?.total_points ?? userTotalPoints ?? 0} Puan
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

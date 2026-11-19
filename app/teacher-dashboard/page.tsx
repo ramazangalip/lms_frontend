@@ -27,12 +27,14 @@ import { Header, TabType } from './components/Header';
 import { BulkReportPdf } from './components/BulkReportPdf';
 import { ChatbotReportPdf } from './components/ChatbotReportPdf';
 import { WeeklyPreTestReportPdf } from './components/WeeklyPreTestReportPdf';
+import { ExamScoreReportPdf } from './components/ExamScoreReportPdf';
 import { ContentManagementTab } from './components/ContentManagementTab';
 import { StudentAnalyticsTab } from './components/StudentAnalyticsTab';
 import { WeeklyPreTestAnalyticsTab } from './components/WeeklyPreTestAnalyticsTab';
 import { ChatbotAnalyticsTab } from './components/ChatbotAnalyticsTab';
 import { SurveyResultsTab } from './components/SurveyResultsTab';
 import { SystemTimeAnalyticsTab } from './components/SystemTimeAnalyticsTab';
+import { ExamScoreReportTab } from './components/ExamScoreReportTab';
 import { StudentReportModal } from './components/StudentReportModal';
 
 export default function TeacherDashboard() {
@@ -75,6 +77,7 @@ export default function TeacherDashboard() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [systemTimeData, setSystemTimeData] = useState<any>(null);
+  const [examScoreData, setExamScoreData] = useState<any>(null);
 
   const [preTestQuestions, setPreTestQuestions] = useState<Question[]>([
     {
@@ -210,6 +213,12 @@ export default function TeacherDashboard() {
     }
     if (activeTab === 'survey_results') {
       fetchSurveyAnalytics(selectedDepartment, surveyPage); 
+    }
+    if (activeTab === 'exam_scores') {
+      // ExamScoreReportTab fetches its own data, but we also fetch for PDF
+      api.get(`/contents/exam-score-report/?department=${selectedDepartment}`)
+        .then(res => setExamScoreData(res.data))
+        .catch(() => setExamScoreData(null));
     }
   }, [activeTab, selectedDepartment, currentPage, surveyPage, selectedSurveyId, fetchAnalytics, fetchWeeklyPreTestAnalytics, fetchChatbotAnalytics, fetchSurveyAnalytics]);
 
@@ -448,6 +457,26 @@ export default function TeacherDashboard() {
     window.print();
     
     if (pretestReport) pretestReport.style.display = 'none';
+  };
+
+  const handlePrintExamScore = () => {
+    const academicReport = document.getElementById('bulk-report-pdf');
+    const chatbotReport = document.getElementById('chatbot-report-pdf');
+    const pretestReport = document.getElementById('weekly-pretest-report-pdf');
+    const examReport = document.getElementById('exam-score-report-pdf');
+    
+    if (academicReport) academicReport.style.display = 'none';
+    if (chatbotReport) chatbotReport.style.display = 'none';
+    if (pretestReport) pretestReport.style.display = 'none';
+    if (examReport) examReport.style.display = 'block';
+    
+    const cleanup = () => {
+      if (examReport) examReport.style.display = 'none';
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    
+    window.print();
   };
 
   const filteredAnalytics = useMemo(() => {
@@ -744,7 +773,7 @@ export default function TeacherDashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 font-roboto text-secondary text-left">
+    <div className={`min-h-screen ${activeTab === 'exam_scores' ? 'bg-[#0e0e0e]' : 'bg-gray-50'} font-roboto text-secondary text-left`}>
       
       {/* 1. PDF ŞABLONLARI (Gizli - Sadece Yazıcıda Görünür) */}
       <BulkReportPdf 
@@ -759,6 +788,9 @@ export default function TeacherDashboard() {
         weeklyPreTestData={filteredWeeklyPreTestData} 
         selectedDepartment={selectedDepartment} 
       />
+      <ExamScoreReportPdf 
+        examData={examScoreData} 
+      />
 
       {/* 2. ÜST NAVİGASYON BAŞLIĞI */}
       <Header 
@@ -767,7 +799,7 @@ export default function TeacherDashboard() {
       />
 
       {/* 3. ANA İÇERİK (MAIN SEKMELERİ) */}
-      <main className="max-w-6xl mx-auto p-4 md:p-12 pt-8 md:pt-12 print:hidden text-left">
+      <main className={`${activeTab === 'exam_scores' ? 'max-w-[1450px] mx-auto p-3 sm:p-6 md:p-8 pt-4 md:pt-6' : 'max-w-6xl mx-auto p-4 md:p-12 pt-8 md:pt-12'} print:hidden text-left`}>
         
         {/* SEKME 1: İÇERİK YÖNETİMİ */}
         {activeTab === 'content' && (
@@ -890,6 +922,16 @@ export default function TeacherDashboard() {
             systemTimeData={systemTimeData}
             selectedWeekTab={selectedWeekTab}
             setSelectedWeekTab={setSelectedWeekTab}
+          />
+        )}
+
+        {/* SEKME 6: VİZE PUAN RAPORU */}
+        {activeTab === 'exam_scores' && (
+          <ExamScoreReportTab
+            selectedDepartment={selectedDepartment}
+            setSelectedDepartment={setSelectedDepartment}
+            onDataLoaded={setExamScoreData}
+            handlePrintExamScore={handlePrintExamScore}
           />
         )}
       </main>
