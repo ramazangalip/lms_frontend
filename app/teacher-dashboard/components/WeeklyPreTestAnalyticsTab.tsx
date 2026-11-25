@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import {
   Filter,
+  Calendar,
   ClipboardList,
   AlertCircle,
   Clock,
@@ -42,6 +43,7 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
   handlePrintWeeklyPreTest,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedWeek, setSelectedWeek] = useState<number>(2);
   const [expandedStudents, setExpandedStudents] = useState<Record<number, boolean>>({});
 
   const toggleStudent = (id: number) => {
@@ -71,9 +73,28 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
   });
 
   const totalD1Students = weeklyPreTestData.length;
-  const pretestTakers = weeklyPreTestData.filter(s => s.total_pretests_taken > 0).length;
-  const activeLockStudents = weeklyPreTestData.filter(s => s.active_locks_count > 0).length;
-  const totalRemediationSeconds = weeklyPreTestData.reduce((acc, curr) => acc + curr.total_remediation_duration_seconds, 0);
+
+  // Seçilen haftaya göre özet istatistikler
+  const pretestTakers = weeklyPreTestData.filter(s => 
+    s.pretests.some(pt => pt.appearing_week === selectedWeek && pt.is_completed)
+  ).length;
+
+  const activeLockStudents = weeklyPreTestData.filter(s => {
+    const weekPt = s.pretests.find(pt => pt.appearing_week === selectedWeek);
+    const unlockedWeekNums = weekPt?.unlocked_weeks || [];
+    return s.remediation_records.some(r => 
+      r.is_active && (r.week_number === selectedWeek || unlockedWeekNums.includes(r.week_number))
+    );
+  }).length;
+
+  const totalRemediationSeconds = weeklyPreTestData.reduce((acc, s) => {
+    const weekPt = s.pretests.find(pt => pt.appearing_week === selectedWeek);
+    const unlockedWeekNums = weekPt?.unlocked_weeks || [];
+    const rems = s.remediation_records.filter(r => 
+      r.week_number === selectedWeek || unlockedWeekNums.includes(r.week_number)
+    );
+    return acc + rems.reduce((sum, r) => sum + r.remediation_duration_seconds, 0);
+  }, 0);
 
   const getMaterialIcon = (type: string) => {
     switch (type) {
@@ -124,6 +145,20 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
             </select>
           </div>
 
+          {/* Hafta Seçici (2. Haftadan itibaren başlar, 'Tüm Haftalar' seçeneği yoktur) */}
+          <div className="flex items-center gap-2 bg-gray-50 px-4 py-2.5 rounded-xl border border-gray-200 text-left shadow-inner">
+            <Calendar size={16} className="text-[#ce1212]" />
+            <select 
+              value={selectedWeek} 
+              onChange={(e) => setSelectedWeek(Number(e.target.value))} 
+              className="bg-transparent text-[11px] font-black uppercase outline-none cursor-pointer text-[#1a1a1a]"
+            >
+              {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(w => (
+                <option key={w} value={w} className="text-black">{w}. Hafta</option>
+              ))}
+            </select>
+          </div>
+
           {/* PDF Butonu */}
           <button 
             onClick={handlePrintWeeklyPreTest}
@@ -153,7 +188,7 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
             <CheckCircle2 size={26} />
           </div>
           <div>
-            <p className="text-gray-400 text-[9px] font-black uppercase tracking-widest mb-1">Pekiştirme Testine Girenler</p>
+            <p className="text-gray-400 text-[9px] font-black uppercase tracking-widest mb-1">{selectedWeek}. Hafta Testine Girenler</p>
             <p className="text-2xl font-black text-[#1a1a1a]">
               {pretestTakers} <span className="text-xs text-gray-400 font-bold">/ {totalD1Students}</span>
             </p>
@@ -165,7 +200,7 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
             <Unlock size={26} />
           </div>
           <div>
-            <p className="text-gray-400 text-[9px] font-black uppercase tracking-widest mb-1">Aktif Telafi Kilidi</p>
+            <p className="text-gray-400 text-[9px] font-black uppercase tracking-widest mb-1">{selectedWeek}. Hafta Aktif Kilit</p>
             <p className="text-2xl font-black text-amber-600">
               {activeLockStudents} <span className="text-xs text-gray-400 font-bold">Öğrenci</span>
             </p>
@@ -177,7 +212,7 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
             <Clock size={26} />
           </div>
           <div>
-            <p className="text-gray-400 text-[9px] font-black uppercase tracking-widest mb-1">Toplam Telafi Süresi</p>
+            <p className="text-gray-400 text-[9px] font-black uppercase tracking-widest mb-1">{selectedWeek}. Hafta Telafi Süresi</p>
             <p className="text-2xl font-black text-[#ce1212]">{formatDuration(totalRemediationSeconds)}</p>
           </div>
         </div>
@@ -231,7 +266,22 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
         <div className="space-y-4">
           {filteredData.map((student, sIdx) => {
             const isExpanded = expandedStudents[student.student_id] ?? false;
-            const hasActiveLock = student.active_locks_count > 0;
+            
+            // Seçilen haftaya göre verileri filtrele ve hesapla
+            const weekPretests = student.pretests.filter(pt => pt.appearing_week === selectedWeek);
+            const weekPretest = weekPretests[0] || null;
+            const unlockedWeekNums = weekPretest?.unlocked_weeks || [];
+
+            // Telafi kayıtları: ya doğrudan seçilen haftaya ait ya da bu haftanın ön testinin açtığı haftalar
+            const weekRemRecords = student.remediation_records.filter(r => 
+              r.week_number === selectedWeek || unlockedWeekNums.includes(r.week_number)
+            );
+
+            const weekActiveLocks = weekRemRecords.filter(r => r.is_active);
+            const hasActiveLock = weekActiveLocks.length > 0;
+            const weekRemDuration = weekRemRecords.reduce((sum, r) => sum + r.remediation_duration_seconds, 0);
+            const weekWrongCount = weekPretest ? weekPretest.wrong_count : 0;
+            const isWeekPretestCompleted = weekPretest && weekPretest.is_completed;
 
             return (
               <div 
@@ -262,7 +312,7 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
                         </span>
                         {hasActiveLock && (
                           <span className="bg-red-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider animate-pulse flex items-center gap-1 shadow">
-                            <Unlock size={10} /> {student.active_locks_count} TELAFİ KİLİDİ AKTİF
+                            <Unlock size={10} /> {weekActiveLocks.length} TELAFİ KİLİDİ AKTİF
                           </span>
                         )}
                       </div>
@@ -275,16 +325,18 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
                   {/* SAĞ: ÖZET ROZETLER & OK BUTONU */}
                   <div className="flex items-center gap-3 self-end md:self-auto flex-wrap">
                     <div className="bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-xl text-center">
-                      <p className="text-[8px] text-gray-400 font-black uppercase tracking-wider">GİRİLEN ÖN TEST</p>
-                      <p className="text-xs font-black text-secondary">{student.total_pretests_taken}</p>
+                      <p className="text-[8px] text-gray-400 font-black uppercase tracking-wider">{selectedWeek}. HAFTA TESTİ</p>
+                      <p className={`text-xs font-black ${isWeekPretestCompleted ? 'text-secondary' : 'text-gray-400'}`}>
+                        {isWeekPretestCompleted ? 'GİRİLDİ' : 'GİRİLMEDİ'}
+                      </p>
                     </div>
                     <div className="bg-red-50 border border-red-200 px-3 py-1.5 rounded-xl text-center">
                       <p className="text-[8px] text-red-500 font-black uppercase tracking-wider">TOPLAM YANLIŞ</p>
-                      <p className="text-xs font-black text-[#ce1212]">{student.total_wrong_questions}</p>
+                      <p className="text-xs font-black text-[#ce1212]">{weekWrongCount}</p>
                     </div>
                     <div className="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl text-center">
                       <p className="text-[8px] text-blue-500 font-black uppercase tracking-wider">TELAFİ ÇALIŞMA SÜRESİ</p>
-                      <p className="text-xs font-black text-blue-700">{formatDuration(student.total_remediation_duration_seconds)}</p>
+                      <p className="text-xs font-black text-blue-700">{formatDuration(weekRemDuration)}</p>
                     </div>
 
                     <div className="text-gray-400 hover:text-black p-1">
@@ -301,98 +353,95 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
                     <div className="space-y-4">
                       <h4 className="text-xs font-black uppercase tracking-widest text-secondary flex items-center gap-2 border-b border-gray-200 pb-2">
                         <ClipboardList size={16} className="text-[#ce1212]" /> 
-                        Haftalık Pekiştirme Testi Performansı ve Yanlış Yapılan Sorular
+                        {selectedWeek}. Hafta Pekiştirme Testi Performansı ve Yanlış Yapılan Sorular
                       </h4>
 
-                      {student.pretests.length === 0 ? (
+                      {!weekPretest ? (
                         <p className="text-xs text-gray-400 italic bg-white p-4 rounded-2xl border border-gray-200">
-                          Öğrenci henüz hiçbir haftanın pekiştirme testine katılmamıştır.
+                          Öğrenci {selectedWeek}. hafta pekiştirme testine henüz katılmamıştır.
                         </p>
                       ) : (
                         <div className="space-y-4">
-                          {student.pretests.map((pt, pIdx) => (
-                            <div 
-                              key={pIdx} 
-                              className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-4"
-                            >
-                              {/* Test Başlığı ve Skor */}
-                              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-100 pb-3">
-                                <div className="flex items-center gap-3">
-                                  <span className="bg-secondary text-white text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider">
-                                    {pt.appearing_week}. HAFTA PEKİŞTİRME TESTİ
+                          <div 
+                            className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm space-y-4"
+                          >
+                            {/* Test Başlığı ve Skor */}
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-100 pb-3">
+                              <div className="flex items-center gap-3">
+                                <span className="bg-secondary text-white text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider">
+                                  {weekPretest.appearing_week}. HAFTA PEKİŞTİRME TESTİ
+                                </span>
+                                {weekPretest.completed_at && (
+                                  <span className="text-[10px] text-gray-400 font-semibold">
+                                    Tarih: {weekPretest.completed_at}
                                   </span>
-                                  {pt.completed_at && (
-                                    <span className="text-[10px] text-gray-400 font-semibold">
-                                      Tarih: {pt.completed_at}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="bg-green-100 text-green-700 text-[10px] font-black px-2.5 py-1 rounded-lg">
-                                    {pt.correct_count} DOĞRU
-                                  </span>
-                                  <span className="bg-red-100 text-red-700 text-[10px] font-black px-2.5 py-1 rounded-lg">
-                                    {pt.wrong_count} YANLIŞ
-                                  </span>
-                                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg ${
-                                    pt.score_percentage >= 70 ? 'bg-green-500 text-white' : 'bg-amber-500 text-white'
-                                  }`}>
-                                    BAŞARI: %{pt.score_percentage}
-                                  </span>
-                                </div>
+                                )}
                               </div>
+                              <div className="flex items-center gap-2">
+                                <span className="bg-green-100 text-green-700 text-[10px] font-black px-2.5 py-1 rounded-lg">
+                                  {weekPretest.correct_count} DOĞRU
+                                </span>
+                                <span className="bg-red-100 text-red-700 text-[10px] font-black px-2.5 py-1 rounded-lg">
+                                  {weekPretest.wrong_count} YANLIŞ
+                                </span>
+                                <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg ${
+                                  weekPretest.score_percentage >= 70 ? 'bg-green-500 text-white' : 'bg-amber-500 text-white'
+                                }`}>
+                                  BAŞARI: %{weekPretest.score_percentage}
+                                </span>
+                              </div>
+                            </div>
 
-                              {/* Yanlış Yapılan Soruların Detayı */}
-                              {pt.wrong_answers.length === 0 ? (
-                                <div className="flex items-center gap-2 text-green-600 bg-green-50/70 p-3 rounded-xl text-xs font-bold">
-                                  <CheckCircle2 size={16} /> Bu testteki tüm sorular doğru yanıtlanmıştır. Telafi kilidi açılmasına gerek kalmamıştır.
-                                </div>
-                              ) : (
-                                <div className="space-y-3">
-                                  <p className="text-[10px] font-black uppercase tracking-wider text-red-600 flex items-center gap-1.5">
-                                    <XCircle size={14} /> Yanlış Yapılan Sorular ve Hedeflenen Telafi Konuları ({pt.wrong_answers.length} Soru):
-                                  </p>
-                                  <div className="grid grid-cols-1 gap-2.5">
-                                    {pt.wrong_answers.map((wa, wIdx) => (
-                                      <div 
-                                        key={wIdx} 
-                                        className="bg-red-50/30 border border-red-200/60 rounded-xl p-3.5 space-y-2 text-left"
-                                      >
-                                        <div className="flex items-start justify-between gap-3">
-                                          <div className="flex items-start gap-2">
-                                            <span className="bg-red-500 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5">
-                                              {wIdx + 1}
-                                            </span>
-                                            <p className="text-xs font-bold text-gray-800 leading-snug">
-                                              {wa.question_text}
-                                            </p>
-                                          </div>
-                                          {wa.target_week && (
-                                            <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider shrink-0 border border-amber-300">
-                                              HEDEF: {wa.target_week}. HAFTA KONUSU
-                                            </span>
-                                          )}
+                            {/* Yanlış Yapılan Soruların Detayı */}
+                            {weekPretest.wrong_answers.length === 0 ? (
+                              <div className="flex items-center gap-2 text-green-600 bg-green-50/70 p-3 rounded-xl text-xs font-bold">
+                                <CheckCircle2 size={16} /> Bu testteki tüm sorular doğru yanıtlanmıştır. Telafi kilidi açılmasına gerek kalmamıştır.
+                              </div>
+                            ) : (
+                              <div className="space-y-3">
+                                <p className="text-[10px] font-black uppercase tracking-wider text-red-600 flex items-center gap-1.5">
+                                  <XCircle size={14} /> Yanlış Yapılan Sorular ve Hedeflenen Telafi Konuları ({weekPretest.wrong_answers.length} Soru):
+                                </p>
+                                <div className="grid grid-cols-1 gap-2.5">
+                                  {weekPretest.wrong_answers.map((wa, wIdx) => (
+                                    <div 
+                                      key={wIdx} 
+                                      className="bg-red-50/30 border border-red-200/60 rounded-xl p-3.5 space-y-2 text-left"
+                                    >
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-start gap-2">
+                                          <span className="bg-red-500 text-white text-[9px] font-black w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5">
+                                            {wIdx + 1}
+                                          </span>
+                                          <p className="text-xs font-bold text-gray-800 leading-snug">
+                                            {wa.question_text}
+                                          </p>
                                         </div>
+                                        {wa.target_week && (
+                                          <span className="bg-amber-100 text-amber-800 text-[8px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider shrink-0 border border-amber-300">
+                                            HEDEF: {wa.target_week}. HAFTA KONUSU
+                                          </span>
+                                        )}
+                                      </div>
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-7 pt-1">
-                                          <div className="bg-white p-2 rounded-lg border border-red-200 flex items-center gap-2 text-[10px]">
-                                            <XCircle size={12} className="text-red-500 shrink-0" />
-                                            <span className="text-gray-400 font-bold uppercase">Öğrencinin Yanıtı:</span>
-                                            <span className="font-black text-red-600">{wa.selected_option_text}</span>
-                                          </div>
-                                          <div className="bg-white p-2 rounded-lg border border-green-200 flex items-center gap-2 text-[10px]">
-                                            <CheckCircle2 size={12} className="text-green-500 shrink-0" />
-                                            <span className="text-gray-400 font-bold uppercase">Doğru Cevap:</span>
-                                            <span className="font-black text-green-700">{wa.correct_option_text}</span>
-                                          </div>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-7 pt-1">
+                                        <div className="bg-white p-2 rounded-lg border border-red-200 flex items-center gap-2 text-[10px]">
+                                          <XCircle size={12} className="text-red-500 shrink-0" />
+                                          <span className="text-gray-400 font-bold uppercase">Öğrencinin Yanıtı:</span>
+                                          <span className="font-black text-red-600">{wa.selected_option_text}</span>
+                                        </div>
+                                        <div className="bg-white p-2 rounded-lg border border-green-200 flex items-center gap-2 text-[10px]">
+                                          <CheckCircle2 size={12} className="text-green-500 shrink-0" />
+                                          <span className="text-gray-400 font-bold uppercase">Doğru Cevap:</span>
+                                          <span className="font-black text-green-700">{wa.correct_option_text}</span>
                                         </div>
                                       </div>
-                                    ))}
-                                  </div>
+                                    </div>
+                                  ))}
                                 </div>
-                              )}
-                            </div>
-                          ))}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -401,16 +450,16 @@ export const WeeklyPreTestAnalyticsTab: React.FC<WeeklyPreTestAnalyticsTabProps>
                     <div className="space-y-4">
                       <h4 className="text-xs font-black uppercase tracking-widest text-secondary flex items-center gap-2 border-b border-gray-200 pb-2">
                         <Unlock size={16} className="text-amber-500" /> 
-                        Telafi Kilitleri ve Telafi Sürecinde Harcanan Süreler (Normal Sürelerden Bağımsız)
+                        {selectedWeek}. Hafta ile İlgili Telafi Kilitleri ve Süreleri (Normal Sürelerden Bağımsız)
                       </h4>
 
-                      {student.remediation_records.length === 0 ? (
+                      {weekRemRecords.length === 0 ? (
                         <p className="text-xs text-gray-400 italic bg-white p-4 rounded-2xl border border-gray-200">
-                          Öğrencinin geçmiş haftalara ait aktif veya geçmiş bir telafi kilit kaydı bulunmamaktadır.
+                          Öğrencinin {selectedWeek}. haftaya ait aktif veya geçmiş bir telafi kilit kaydı bulunmamaktadır.
                         </p>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {student.remediation_records.map((rec, rIdx) => (
+                          {weekRemRecords.map((rec, rIdx) => (
                             <div 
                               key={rIdx}
                               className={`bg-white rounded-2xl p-5 border shadow-sm space-y-4 transition-all ${
