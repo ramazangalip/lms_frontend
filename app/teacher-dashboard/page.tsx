@@ -417,67 +417,49 @@ export default function TeacherDashboard() {
       });
   }, [selectedDepartment, activeTab]);
 
-  const handlePrintChatbot = () => {
-    const academicReport = document.getElementById('bulk-report-pdf');
-    const chatbotReport = document.getElementById('chatbot-report-pdf');
-    const pretestReport = document.getElementById('weekly-pretest-report-pdf');
-    
-    if (academicReport) academicReport.style.display = 'none';
-    if (pretestReport) pretestReport.style.display = 'none';
-    if (chatbotReport) chatbotReport.style.display = 'block';
-    
-    window.print();
-    
-    if (chatbotReport) chatbotReport.style.display = 'none';
-  };
+  const printReport = (targetId: string) => {
+    const allReports = [
+      'bulk-report-pdf',
+      'chatbot-report-pdf',
+      'weekly-pretest-report-pdf',
+      'exam-score-report-pdf'
+    ];
 
-  const handlePrintAcademic = () => {
-    const academicReport = document.getElementById('bulk-report-pdf');
-    const chatbotReport = document.getElementById('chatbot-report-pdf');
-    const pretestReport = document.getElementById('weekly-pretest-report-pdf');
-    
-    if (chatbotReport) chatbotReport.style.display = 'none';
-    if (pretestReport) pretestReport.style.display = 'none';
-    if (academicReport) academicReport.style.display = 'block';
-    
-    window.print();
-    
-    if (academicReport) academicReport.style.display = 'none';
-  };
+    allReports.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        if (id === targetId) {
+          el.classList.add('print-active');
+          el.style.setProperty('display', 'block', 'important');
+          el.style.setProperty('visibility', 'visible', 'important');
+        } else {
+          el.classList.remove('print-active');
+          el.style.setProperty('display', 'none', 'important');
+          el.style.setProperty('visibility', 'hidden', 'important');
+        }
+      }
+    });
 
-  const handlePrintWeeklyPreTest = () => {
-    const academicReport = document.getElementById('bulk-report-pdf');
-    const chatbotReport = document.getElementById('chatbot-report-pdf');
-    const pretestReport = document.getElementById('weekly-pretest-report-pdf');
-    
-    if (academicReport) academicReport.style.display = 'none';
-    if (chatbotReport) chatbotReport.style.display = 'none';
-    if (pretestReport) pretestReport.style.display = 'block';
-    
-    window.print();
-    
-    if (pretestReport) pretestReport.style.display = 'none';
-  };
-
-  const handlePrintExamScore = () => {
-    const academicReport = document.getElementById('bulk-report-pdf');
-    const chatbotReport = document.getElementById('chatbot-report-pdf');
-    const pretestReport = document.getElementById('weekly-pretest-report-pdf');
-    const examReport = document.getElementById('exam-score-report-pdf');
-    
-    if (academicReport) academicReport.style.display = 'none';
-    if (chatbotReport) chatbotReport.style.display = 'none';
-    if (pretestReport) pretestReport.style.display = 'none';
-    if (examReport) examReport.style.display = 'block';
-    
     const cleanup = () => {
-      if (examReport) examReport.style.display = 'none';
+      allReports.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.classList.remove('print-active');
+          el.style.removeProperty('display');
+          el.style.removeProperty('visibility');
+        }
+      });
       window.removeEventListener('afterprint', cleanup);
     };
     window.addEventListener('afterprint', cleanup);
-    
+
     window.print();
   };
+
+  const handlePrintChatbot = () => printReport('chatbot-report-pdf');
+  const handlePrintAcademic = () => printReport('bulk-report-pdf');
+  const handlePrintWeeklyPreTest = () => printReport('weekly-pretest-report-pdf');
+  const handlePrintExamScore = () => printReport('exam-score-report-pdf');
 
   const filteredAnalytics = useMemo(() => {
     return analytics.filter(s => !s.category || s.category.toLowerCase() === 'd1');
@@ -865,6 +847,7 @@ export default function TeacherDashboard() {
           <StudentAnalyticsTab
             totalCount={totalCount}
             analytics={filteredAnalytics}
+            allStudentsData={filteredBulkData}
             selectedDepartment={selectedDepartment}
             setSelectedDepartment={setSelectedDepartment}
             currentPage={currentPage}

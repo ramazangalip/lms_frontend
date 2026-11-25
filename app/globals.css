@@ -114,16 +114,28 @@ form {
   /* Diğer her şeyi gizle */
   body * { visibility: hidden; }
   
-  /* Sadece yazdırmak istediğimiz alanı göster (Hangi butona basıldıysa) */
-  #bulk-report-pdf, #bulk-report-pdf *, 
-  #chatbot-report-pdf, #chatbot-report-pdf *,
-  #weekly-pretest-report-pdf, #weekly-pretest-report-pdf *,
-  #exam-score-report-pdf, #exam-score-report-pdf * {
+  /* Sadece print için aktif kılınan rapor görünür */
+  .print-active, .print-active * {
     visibility: visible !important;
   }
 
-  #bulk-report-pdf { position: absolute; left: 0; top: 0; width: 100%; }
-  #chatbot-report-pdf { position: absolute; left: 0; top: 0; width: 100%; page-break-before: always; }
-  #weekly-pretest-report-pdf { position: absolute; left: 0; top: 0; width: 100%; }
-  #exam-score-report-pdf { position: absolute; left: 0; top: 0; width: 100%; display: block !important; }
+  #bulk-report-pdf.print-active,
+  #chatbot-report-pdf.print-active,
+  #weekly-pretest-report-pdf.print-active,
+  #exam-score-report-pdf.print-active {
+    display: block !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    visibility: visible !important;
+  }
+
+  #bulk-report-pdf:not(.print-active),
+  #chatbot-report-pdf:not(.print-active),
+  #weekly-pretest-report-pdf:not(.print-active),
+  #exam-score-report-pdf:not(.print-active) {
+    display: none !important;
+    visibility: hidden !important;
+  }
 }

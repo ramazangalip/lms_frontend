@@ -1,5 +1,5 @@
 "use client";
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Users,
   Filter,
@@ -9,13 +9,16 @@ import {
   Search,
   ChevronLeft,
   ChevronRight,
-  Target
+  Target,
+  CheckCircle2,
+  Calendar
 } from 'lucide-react';
-import { StudentAnalytics, getDeptName, departmentList, formatDuration } from '../types';
+import { StudentAnalytics, BulkStudentData, getDeptName, departmentList, formatDuration } from '../types';
 
 interface StudentAnalyticsTabProps {
   totalCount: number;
   analytics: StudentAnalytics[];
+  allStudentsData?: BulkStudentData[];
   selectedDepartment: string;
   setSelectedDepartment: (dept: string) => void;
   currentPage: number;
@@ -34,6 +37,7 @@ interface StudentAnalyticsTabProps {
 export const StudentAnalyticsTab: React.FC<StudentAnalyticsTabProps> = ({
   totalCount,
   analytics,
+  allStudentsData,
   selectedDepartment,
   setSelectedDepartment,
   currentPage,
@@ -44,6 +48,29 @@ export const StudentAnalyticsTab: React.FC<StudentAnalyticsTabProps> = ({
   loading,
   deptSummary
 }) => {
+  const [selectedKpiWeek, setSelectedKpiWeek] = useState<number>(1);
+
+  const completedCount = useMemo(() => {
+    const dataSource = (allStudentsData && allStudentsData.length > 0) ? allStudentsData : analytics;
+    if (!dataSource || dataSource.length === 0) return 0;
+
+    return dataSource.filter(student => {
+      const weekData = student.weekly_breakdown?.find(
+        (w: any) => (w.week === selectedKpiWeek || w.week_number === selectedKpiWeek)
+      );
+      if (!weekData) return false;
+      return (weekData.progress >= 100 || (weekData.progress_2 && weekData.progress_2 >= 100));
+    }).length;
+  }, [allStudentsData, analytics, selectedKpiWeek]);
+
+  const totalD1Students = (allStudentsData && allStudentsData.length > 0)
+    ? allStudentsData.length
+    : (totalCount || analytics.length || 0);
+
+  const completionPercentage = totalD1Students > 0
+    ? Math.round((completedCount / totalD1Students) * 100)
+    : 0;
+
   return (
     <div className="animate-in slide-in-from-bottom-4 duration-500 space-y-6 md:space-y-8 pb-10 text-left">
       
@@ -81,6 +108,51 @@ export const StudentAnalyticsTab: React.FC<StudentAnalyticsTabProps> = ({
           <button onClick={handlePrintAcademic} className="flex items-center justify-center gap-3 bg-red-700 hover:bg-red-800 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl transition-all leading-none active:scale-95">
             <FileText size={18} /> {getDeptName(selectedDepartment).toUpperCase()} AKADEMİK RAPOR
           </button>
+        </div>
+      </div>
+
+      {/* SEÇİLEN HAFTAYI %100 TAMAMLAYAN ÖĞRENCİLER KPI KARTI */}
+      <div className="bg-white p-5 md:p-6 rounded-3xl shadow-xl border border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 text-left">
+        <div className="flex items-center gap-4 leading-none">
+          <div className="bg-green-50 p-3.5 rounded-2xl text-green-600 flex items-center justify-center shrink-0">
+            <CheckCircle2 size={28} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+              <p className="text-gray-400 text-[10px] font-black uppercase tracking-widest leading-none">
+                {selectedKpiWeek}. Hafta İçeriğini %100 Tamamlayan Öğrenci Sayısı
+              </p>
+              <span className="bg-red-50 text-[#ce1212] border border-red-200/60 text-[9px] font-black px-2 py-0.5 rounded-md uppercase">
+                D1 KATEGORİSİ
+              </span>
+            </div>
+            <div className="flex items-baseline gap-2">
+              <p className="text-2xl md:text-3xl font-black text-secondary leading-none">
+                {completedCount}
+              </p>
+              <span className="text-xs md:text-sm font-bold text-gray-400">
+                / {totalD1Students} Öğrenci
+              </span>
+              <span className="bg-green-100 text-green-700 font-black text-[10px] px-2.5 py-0.5 rounded-lg ml-2">
+                %{completionPercentage} Tamamlama Oranı
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* HAFTA SEÇİCİ (SADECE BU KARTI ETKİLER - 'TÜM HAFTALAR' SEÇENEĞİ YOK) */}
+        <div className="flex items-center gap-2.5 bg-gray-50 hover:bg-gray-100/80 px-4 py-2.5 rounded-2xl border border-gray-200 w-full md:w-auto transition-colors">
+          <Calendar size={16} className="text-gray-500 shrink-0" />
+          <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider shrink-0">Hafta:</span>
+          <select 
+            value={selectedKpiWeek} 
+            onChange={(e) => setSelectedKpiWeek(Number(e.target.value))}
+            className="bg-transparent text-xs font-black uppercase outline-none cursor-pointer text-secondary flex-1 md:flex-initial"
+          >
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14].map(w => (
+              <option key={w} value={w}>{w}. Hafta</option>
+            ))}
+          </select>
         </div>
       </div>
 
